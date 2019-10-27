@@ -2,22 +2,23 @@ mod pwlp;
 extern crate clap;
 
 use std::net::UdpSocket;
+use std::collections::HashMap;
 use clap::{App, Arg};
-use pwlp::{Message};
+use pwlp::{Message, MessageType};
 use serde::Deserialize;
 use std::fs::{File};
 use std::io::Read;
+use eui48::{MacAddress};
 
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
 	bind_address: Option<String>,
 	secret: Option<String>,
-	devices: Option<Vec<DeviceConfig>>,
+	devices: Option<HashMap<String, DeviceConfig>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 struct DeviceConfig {
-	mac: String,
 	secret: Option<String>
 }
 
@@ -54,23 +55,19 @@ fn main() -> std::io::Result<()> {
 	let default_secret = String::from("secret");
 	let global_secret = config.secret.unwrap_or(default_secret).as_bytes().to_owned();
 
-	println!("PLWP server listening at {}", bind_address);
+	println!("PWLP server listening at {}", bind_address);
 
 	loop {
 		let mut buf = [0; 1500];
-		let (amt, src) = socket.recv_from(&mut buf)?;
-		println!("[{}]: {} bytes", src, amt);
+		let (amt, source_address) = socket.recv_from(&mut buf)?;
 
 		match Message::peek_mac_address(&buf[0..amt]) {
 			Err(t) => println!("\tError reading MAC address: {:?}", t),
 			Ok(mac) => {
 				// Do we have a config for this mac?
-				let device_config: Option<DeviceConfig> = match &config.devices {
+				let device_config: Option<&DeviceConfig> = match &config.devices {
 					Some(devices) => {
-						match devices.iter().find(|x| x.mac == mac.to_canonical()) {
-							Some(d) => Some(d.clone()),
-							None => None
-						}
+						Some(&devices[&mac.to_canonical()])
 					},
 					None => None
 				};
@@ -86,8 +83,29 @@ fn main() -> std::io::Result<()> {
 
 				// Decode message
 				match Message::from_buffer(&buf[0..amt], secret) {
-					Err(t) => println!("\tError {:?}", t),
-					Ok(m) => println!("\tMessage {:?}", m)
+					Err(t) => println!("{} error {:?} (size={}b)", source_address, t, amt),
+					Ok(m) => {
+						println!("{} @ {}: {:?} t={}", mac.to_canonical(), source_address, m.message_type, m.unix_time);
+
+						match m.message_type {
+							MessageType::Ping => {
+								let pong = Message {
+									message_type: MessageType::Pong,
+									unix_time: m.unix_time,
+									mac_address: MacAddress::nil()
+								};
+
+								// Check deserialize
+								Message::from_buffer(&pong.signed(secret), secret).expect("deserialize own message");
+
+								match socket.send_to(&pong.signed(secret), source_address) {
+									Err(t) => println!("Send pong failed: {:?}", t),
+									Ok(_) => {}
+								}
+							}
+							_ => {}
+						}
+					}
 				}
 			}
 		}

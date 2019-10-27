@@ -1,5 +1,6 @@
 extern crate hmacsha1;
 use hmacsha1::hmac_sha1;
+use byteorder::{LittleEndian, WriteBytesExt};
 
 use std::convert::TryInto;
 use eui48::{MacAddress};
@@ -26,6 +27,18 @@ impl MessageType {
 	}
 }
 
+impl From<&MessageType> for u8 {
+	fn from(v: &MessageType) -> u8 {
+		match v {
+			MessageType::Ping => 0x01,
+			MessageType::Pong => 0x02,
+			MessageType::Set => 0x03,
+			MessageType::Run => 0x04,
+			_ => panic!("invalid message type")
+		}
+	}
+}
+
 #[derive(Debug)]
 pub enum MessageError {
 	SignatureInvalid,
@@ -36,16 +49,20 @@ pub enum MessageError {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Message {
-	mac_address: MacAddress,
-	unix_time: u32,
-	message_type: MessageType,
+	pub mac_address: MacAddress,
+	pub unix_time: u32,
+	pub message_type: MessageType,
 }
 
 const SHA1_SIZE: usize = 20;
+const MAC_SIZE: usize = 6;
+const MESSAGE_TYPE_SIZE: usize = 1;
+const TIME_SIZE: usize = 4;
 
 impl Message {
+	// Wire format is [MAC: 6] [TIME: 4] [TYPE: 1] .... [SHA1: 20]
 	pub fn peek_mac_address(buffer: &[u8]) -> Result<MacAddress, MessageError> {
-		if buffer.len() < (SHA1_SIZE + 6) {
+		if buffer.len() < (SHA1_SIZE + MAC_SIZE) {
 			return Err(MessageError::MessageTooShort);
 		}
 
@@ -72,12 +89,31 @@ impl Message {
 
 		// MAC address
 		let mac_address = Message::peek_mac_address(buffer)?;
-		let type_number = buffer[(6 + 4)];
+		let type_number = buffer[(MAC_SIZE + TIME_SIZE)];
 
 		Ok(Message {
 			mac_address: mac_address,
-			unix_time: u32::from_le_bytes(buffer[6..10].try_into().unwrap()),
+			unix_time: u32::from_le_bytes(buffer[MAC_SIZE..(MAC_SIZE + TIME_SIZE)].try_into().unwrap()),
 			message_type: MessageType::from(type_number)
 		})
+	}
+
+	pub fn signed(&self, key: &[u8]) -> Vec<u8> {
+		let data_size = MAC_SIZE + TIME_SIZE + MESSAGE_TYPE_SIZE + match &self.message_type {
+			MessageType::Ping => 0,
+			MessageType::Pong => 0,
+			_ => 0
+		};
+		let mut buf = Vec::with_capacity(data_size + SHA1_SIZE);
+
+		// Fill zero MAC
+		buf.extend_from_slice(self.mac_address.as_bytes());
+
+		buf.write_u32::<LittleEndian>(self.unix_time).unwrap();
+		buf.push(u8::from(&self.message_type));
+
+		let signature = hmac_sha1(key, &buf[0..data_size]);
+		buf.extend_from_slice(&signature);
+		return buf
 	}
 }
