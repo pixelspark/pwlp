@@ -1,0 +1,11 @@
+[package]
+name = "pwlp-server"
+version = "0.1.0"
+authors = ["Tommy van der Vorst <tommy@pixelspark.nl>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "2.33.0"
+rust-crypto = "^0.2"
