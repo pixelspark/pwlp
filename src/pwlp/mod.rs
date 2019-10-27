@@ -1,7 +1,6 @@
-extern crate crypto;
-use crypto::mac::{Mac, MacResult};
-use crypto::hmac::Hmac;
-use crypto::sha1::Sha1;
+extern crate hmacsha1;
+use hmacsha1::hmac_sha1;
+
 use std::convert::TryInto;
 use eui48::{MacAddress};
 
@@ -63,11 +62,8 @@ impl Message {
 		}
 
 		// Verify message signature
-		let data_buffer = &buffer[0..data_size];
-		let mut mac = Hmac::new(Sha1::new(), key);
-		mac.input(data_buffer);
-		let calculated_hmac = mac.result();
-		let provided_hmac = MacResult::new(&buffer[data_size..(data_size + SHA1_SIZE)]);
+		let calculated_hmac = hmac_sha1(key, &buffer[0..data_size]);
+		let provided_hmac = &buffer[data_size..(data_size + SHA1_SIZE)];
 
 		// Verify HMAC
 		if calculated_hmac != provided_hmac {
