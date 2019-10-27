@@ -1,0 +1,8 @@
+secret = "Secret"
+
+[[devices]]
+mac = "18-fe-34-f5-c1-79"
+secret = "Secret2"
+
+[[devices]]
+mac = "5c-cf-7f-0b-33-d5"

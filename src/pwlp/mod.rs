@@ -3,6 +3,7 @@ use crypto::mac::{Mac, MacResult};
 use crypto::hmac::Hmac;
 use crypto::sha1::Sha1;
 use std::convert::TryInto;
+use eui48::{MacAddress};
 
 #[derive(Debug)]
 #[repr(u8)]
@@ -29,13 +30,14 @@ impl MessageType {
 #[derive(Debug)]
 pub enum MessageError {
 	SignatureInvalid,
-	MessageTooShort
+	MessageTooShort,
+	MacAddressInvalid
 }
 
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Message {
-	mac_address: [u8; 6],
+	mac_address: MacAddress,
 	unix_time: u32,
 	message_type: MessageType,
 }
@@ -43,14 +45,15 @@ pub struct Message {
 const SHA1_SIZE: usize = 20;
 
 impl Message {
-	pub fn peek_mac_address(buffer: &[u8]) -> Result<[u8; 6], MessageError> {
+	pub fn peek_mac_address(buffer: &[u8]) -> Result<MacAddress, MessageError> {
 		if buffer.len() < (SHA1_SIZE + 6) {
 			return Err(MessageError::MessageTooShort);
 		}
 
-		let mut mac: [u8; 6] = [0; 6];
-		mac.clone_from_slice(&buffer[0..6]);
-		return Ok(mac);
+		match MacAddress::from_bytes(&buffer[0..6]) {
+			Ok(m) => return Ok(m),
+			Err(()) => return Err(MessageError::MacAddressInvalid)
+		}
 	}
 
 	pub fn from_buffer(buffer: &[u8], key: &[u8]) -> Result<Message, MessageError> {
@@ -72,13 +75,11 @@ impl Message {
 		}
 
 		// MAC address
-		let mut mac: [u8; 6] = [0; 6];
-		mac.clone_from_slice(&buffer[0..6]);
-
+		let mac_address = Message::peek_mac_address(buffer)?;
 		let type_number = buffer[(6 + 4)];
 
 		Ok(Message {
-			mac_address: mac,
+			mac_address: mac_address,
 			unix_time: u32::from_le_bytes(buffer[6..10].try_into().unwrap()),
 			message_type: MessageType::from(type_number)
 		})
