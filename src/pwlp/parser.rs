@@ -4,7 +4,7 @@ use nom::{
 	branch::alt,
 	combinator::{map, map_res},
 	multi::{fold_many0, separated_list},
-	sequence::{pair, preceded, tuple}
+	sequence::{pair, preceded, tuple, terminated}
 };
 
 use super::instructions;
@@ -14,6 +14,8 @@ use super::program::{Program};
 enum Node {
 	Expression(Expression),
 	Special(instructions::Special),
+	UserCall(instructions::UserCommand, Expression),
+	User(instructions::UserCommand),
 	Statements(Vec<Node>),
 	Loop(Vec<Node>),
 	If(Expression, Vec<Node>)
@@ -28,6 +30,14 @@ impl Node {
 			},
 			Node::Special(s) => {
 				program.special(*s);
+			},
+			Node::User(s) => {
+				program.user(*s);
+			},
+			Node::UserCall(s, e) => {
+				e.assemble(program);
+				program.user(*s);
+				program.pop(1);
 			},
 			Node::Statements(stmts) => {
 				for i in stmts.iter() {
@@ -223,6 +233,18 @@ fn special_statement(input: &str) -> IResult<&str, Node> {
 	))(input)
 }
 
+fn user_statement(input: &str) -> IResult<&str, Node> {
+	alt((
+		map(tag("blit"), |_| Node::User(instructions::UserCommand::BLIT)),
+		map(tag("get_length"), |_| Node::User(instructions::UserCommand::GET_LENGTH)),
+		map(tag("get_wall_time"), |_| Node::User(instructions::UserCommand::GET_WALL_TIME)),
+		map(tag("get_precise_time"), |_| Node::User(instructions::UserCommand::GET_PRECISE_TIME)),
+		map(tuple((tag("set_pixel("), expression, tag(")"))), |t| {
+			Node::UserCall(instructions::UserCommand::SET_PIXEL, t.1)
+		})
+	))(input)
+}
+
 fn if_statement(input: &str) -> IResult<&str, Node> {
 	map(tuple((tag("if("), expression, tag(")"), sp, tag("{"), program, tag("}"))), |t| {
 		if let Node::Statements(ss) = t.5 {
@@ -247,13 +269,13 @@ fn loop_statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn statement(input: &str) -> IResult<&str, Node> {
-	alt((if_statement, loop_statement, expression_statement, special_statement))(input)
+	alt((if_statement, loop_statement, expression_statement, user_statement, special_statement))(input)
 }
 
 fn program(input: &str) -> IResult<&str, Node> {
-	map(separated_list(preceded(sp, tag(";")), preceded(sp, statement)), |statements| {
+	terminated(map(separated_list(preceded(sp, tag(";")), preceded(sp, statement)), |statements| {
 		Node::Statements(statements)
-	})(input)
+	}), sp)(input)
 }
 
 pub fn parse(source: &str) -> Result<Program, String> {

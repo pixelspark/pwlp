@@ -150,7 +150,8 @@ impl std::fmt::Display for Binary {
 }
 
 #[allow(dead_code, non_camel_case_types)]
-pub(crate) enum UserCommand {
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum UserCommand {
 	GET_LENGTH = 0,
 	GET_WALL_TIME = 1,
 	GET_PRECISE_TIME = 2,

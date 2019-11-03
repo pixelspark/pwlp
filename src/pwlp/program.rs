@@ -56,7 +56,7 @@ impl Program {
 		self.write(&[Prefix::SPECIAL as u8 | u as u8]) // SPECIAL u
 	}
 
-	fn user(&mut self, u: UserCommand) -> &mut Program {
+	pub fn user(&mut self, u: UserCommand) -> &mut Program {
 		self.stack_size += match u {
 			UserCommand::GET_LENGTH => 1,
 			UserCommand::GET_PRECISE_TIME => 1,
