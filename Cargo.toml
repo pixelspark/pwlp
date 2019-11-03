@@ -1,5 +1,5 @@
 [package]
-name = "pwlp-server"
+name = "pwlp"
 version = "0.1.0"
 authors = ["Tommy van der Vorst <tommy@pixelspark.nl>"]
 edition = "2018"
@@ -13,3 +13,4 @@ eui48 = "0.4.6"
 toml = "0.5.3"
 byteorder = "1.3.2"
 serde = { version = "1.0", features = ["derive"] }
+nom = "5.0.1"

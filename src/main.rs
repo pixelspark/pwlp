@@ -3,12 +3,13 @@ extern crate clap;
 
 use std::net::UdpSocket;
 use std::collections::HashMap;
-use clap::{App, Arg};
+use clap::{App, Arg, SubCommand};
 use pwlp::{Message, MessageType};
 use pwlp::program::{Program};
+use pwlp::parser::parse;
 use serde::Deserialize;
 use std::fs::{File};
-use std::io::Read;
+use std::io::{Read, Write};
 use eui48::{MacAddress};
 
 #[derive(Deserialize, Debug, Clone)]
@@ -28,54 +29,24 @@ fn main() -> std::io::Result<()> {
 		.version("1.0")
 		.about("Pixelspark wireless LED protocol server")
 		.author("Pixelspark")
-		.arg(Arg::with_name("bind")
-			.short("b")
-			.long("bind")
-			.value_name("ADDRESS")
-			.help("Address the server should listen at")
-			.takes_value(true))
 		.arg(Arg::with_name("config")
 			.short("c")
 			.long("config")
 			.value_name("FILE")
 			.help("Config file to read")
 			.takes_value(true))
-		.get_matches(); 
-
-	let mut program = Program::new();
-	program
-		.push(0) // let counter = 0
-		.repeat_forever(|p| { // while(true)
-			p.inc() // counter++
-			.get_length() // let length = get_length()
-			.r#mod() // counter % length
-			.get_length() // let led_counter = get_length()
-			.repeat(|q| { // while(--led_counter)
-				q.dup()
-				.peek(2)
-				.lte() // led_counter <= length
-				.if_zero(|r| {
-					r.peek(1)
-					.push(0xFF000000) 
-					.or() // led_value = 0xFF000000 | led_counter
-					.set_pixel()  // set_pixel(led_value)
-					.pop(1)
-				})
-				.if_not_zero(|r| {
-					r.peek(1)
-					.push(0x00FF0000)
-					.or()
-					.set_pixel()
-					.pop(1)
-				})
-				.pop(1)
-			})
-			.blit()
-			.pop(1)
-			.r#yield()
-		});
-
-	println!("Program:\n{:?}", program);
+		.subcommand(SubCommand::with_name("compile")
+			.about("compiles a script to binary")
+			.arg(Arg::with_name("file").index(1).takes_value(true).help("the file to compile"))
+			.arg(Arg::with_name("output").index(2).takes_value(true)).help("the file to write the binary output to"))
+		.subcommand(SubCommand::with_name("serve")
+			.about("start server")
+			.arg(Arg::with_name("bind")
+				.short("b")
+				.long("bind")
+				.value_name("ADDRESS")
+				.help("Address the server should listen at")
+				.takes_value(true))).get_matches(); 
 
 	// Read configuration file
 	let config_file = matches.value_of("config").unwrap_or("config.toml");
@@ -83,80 +54,140 @@ fn main() -> std::io::Result<()> {
 	File::open(config_file)?.read_to_string(&mut config_string)?;
 	let config: Config = toml::from_str(&config_string)?;
 
-	// Figure out bind address and open socket
-	let config_bind_address = config.bind_address.unwrap_or(String::from("0.0.0.0:33333"));
-	let bind_address = matches.value_of("bind").unwrap_or(&config_bind_address);
-	let socket = UdpSocket::bind(bind_address).expect("could not bind to socket");
+	// Find out which subcommand to perform
+	if let Some(matches) = matches.subcommand_matches("compile") {
+		if let Some(source_file) = matches.value_of("file") {
+			let mut source = String::new();
+			File::open(source_file)?.read_to_string(&mut source)?;
+			println!("{}", source_file);
+			
+			match parse(&source) {
+				Ok(prg) => {
+					println!("Program:\n{:?}", &prg);
+					if let Some(out_file) = matches.value_of("output") {
+						File::create(out_file)?.write(&prg.code)?;
+					}
+				},
+				Err(s) => println!("Error: {}", s)
+			};
+		}
+		else {
+			println!("No source file specified");
+		}
+	}
+	else if let Some(matches) = matches.subcommand_matches("serve") {
+		let mut program = Program::new();
+		program
+			.push(0) // let counter = 0
+			.repeat_forever(|p| { // while(true)
+				p.inc() // counter++
+				.get_length() // let length = get_length()
+				.r#mod() // counter % length
+				.get_length() // let led_counter = get_length()
+				.repeat(|q| { // while(--led_counter)
+					q.dup()
+					.peek(2)
+					.lte() // led_counter <= length
+					.if_zero(|r| {
+						r.peek(1)
+						.push(0xFF000000) 
+						.or() // led_value = 0xFF000000 | led_counter
+						.set_pixel()  // set_pixel(led_value)
+						.pop(1);
+					})
+					.if_not_zero(|r| {
+						r.peek(1)
+						.push(0x00FF0000)
+						.or()
+						.set_pixel()
+						.pop(1);
+					})
+					.pop(1);
+				})
+				.blit()
+				.pop(1)
+				.r#yield();
+			});
 
-	let default_secret = String::from("secret");
-	let global_secret = config.secret.unwrap_or(default_secret).as_bytes().to_owned();
+		println!("Program:\n{:?}", program);
+		
+		// Start server
+		// Figure out bind address and open socket
+		let config_bind_address = config.bind_address.unwrap_or(String::from("0.0.0.0:33333"));
+		let bind_address = matches.value_of("bind").unwrap_or(&config_bind_address);
+		let socket = UdpSocket::bind(bind_address).expect("could not bind to socket");
 
-	println!("PWLP server listening at {}", bind_address);
+		let default_secret = String::from("secret");
+		let global_secret = config.secret.unwrap_or(default_secret).as_bytes().to_owned();
 
-	loop {
-		let mut buf = [0; 1500];
-		let (amt, source_address) = socket.recv_from(&mut buf)?;
+		println!("PWLP server listening at {}", bind_address);
 
-		match Message::peek_mac_address(&buf[0..amt]) {
-			Err(t) => println!("\tError reading MAC address: {:?}", t),
-			Ok(mac) => {
-				// Do we have a config for this mac?
-				let device_config: Option<&DeviceConfig> = match &config.devices {
-					Some(devices) => {
-						Some(&devices[&mac.to_canonical()])
-					},
-					None => None
-				};
+		loop {
+			let mut buf = [0; 1500];
+			let (amt, source_address) = socket.recv_from(&mut buf)?;
 
-				// Find the secret to use to verify the message signature
-				let secret = match &device_config {
-					Some(d) => match &d.secret {
-						Some(s) => s.as_bytes(),
+			match Message::peek_mac_address(&buf[0..amt]) {
+				Err(t) => println!("\tError reading MAC address: {:?}", t),
+				Ok(mac) => {
+					// Do we have a config for this mac?
+					let device_config: Option<&DeviceConfig> = match &config.devices {
+						Some(devices) => {
+							Some(&devices[&mac.to_canonical()])
+						},
+						None => None
+					};
+
+					// Find the secret to use to verify the message signature
+					let secret = match &device_config {
+						Some(d) => match &d.secret {
+							Some(s) => s.as_bytes(),
+							None => &global_secret
+						},
 						None => &global_secret
-					},
-					None => &global_secret
-				};
+					};
 
-				// Decode message
-				match Message::from_buffer(&buf[0..amt], secret) {
-					Err(t) => println!("{} error {:?} (size={}b source={} secret={:?})", source_address, t, amt, mac, secret),
-					Ok(m) => {
-						println!("{} @ {}: {:?} t={}", mac.to_canonical(), source_address, m.message_type, m.unix_time);
+					// Decode message
+					match Message::from_buffer(&buf[0..amt], secret) {
+						Err(t) => println!("{} error {:?} (size={}b source={} secret={:?})", source_address, t, amt, mac, secret),
+						Ok(m) => {
+							println!("{} @ {}: {:?} t={}", mac.to_canonical(), source_address, m.message_type, m.unix_time);
 
-						match m.message_type {
-							MessageType::Ping => {
-								let pong = Message {
-									message_type: MessageType::Pong,
-									unix_time: m.unix_time,
-									mac_address: MacAddress::nil(),
-									payload: None
-								};
+							match m.message_type {
+								MessageType::Ping => {
+									let pong = Message {
+										message_type: MessageType::Pong,
+										unix_time: m.unix_time,
+										mac_address: MacAddress::nil(),
+										payload: None
+									};
 
-								// Check deserialize
-								Message::from_buffer(&pong.signed(secret), secret).expect("deserialize own message");
+									// Check deserialize
+									Message::from_buffer(&pong.signed(secret), secret).expect("deserialize own message");
 
-								match socket.send_to(&pong.signed(secret), source_address) {
-									Err(t) => println!("Send pong failed: {:?}", t),
-									Ok(_) => {}
-								};
+									match socket.send_to(&pong.signed(secret), source_address) {
+										Err(t) => println!("Send pong failed: {:?}", t),
+										Ok(_) => {}
+									};
 
-								let run = Message {
-									message_type: MessageType::Run,
-									unix_time: m.unix_time,
-									mac_address: MacAddress::nil(),
-									payload: Some(program.code.clone())
-								};
+									let run = Message {
+										message_type: MessageType::Run,
+										unix_time: m.unix_time,
+										mac_address: MacAddress::nil(),
+										payload: Some(program.code.clone())
+									};
 
-								match socket.send_to(&run.signed(secret), source_address) {
-									Err(t) => println!("Send pong failed: {:?}", t),
-									Ok(_) => {}
+									match socket.send_to(&run.signed(secret), source_address) {
+										Err(t) => println!("Send pong failed: {:?}", t),
+										Ok(_) => {}
+									}
 								}
+								_ => {}
 							}
-							_ => {}
 						}
 					}
 				}
 			}
 		}
-	}
+	};
+	Ok(())
 }
