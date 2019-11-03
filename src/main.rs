@@ -5,6 +5,7 @@ use std::net::UdpSocket;
 use std::collections::HashMap;
 use clap::{App, Arg};
 use pwlp::{Message, MessageType};
+use pwlp::program::{Program};
 use serde::Deserialize;
 use std::fs::{File};
 use std::io::Read;
@@ -40,6 +41,41 @@ fn main() -> std::io::Result<()> {
 			.help("Config file to read")
 			.takes_value(true))
 		.get_matches(); 
+
+	let mut program = Program::new();
+	program
+		.push(0) // let counter = 0
+		.repeat_forever(|p| { // while(true)
+			p.inc() // counter++
+			.get_length() // let length = get_length()
+			.r#mod() // counter % length
+			.get_length() // let led_counter = get_length()
+			.repeat(|q| { // while(--led_counter)
+				q.dup()
+				.peek(2)
+				.lte() // led_counter <= length
+				.if_zero(|r| {
+					r.peek(1)
+					.push(0xFF000000) 
+					.or() // led_value = 0xFF000000 | led_counter
+					.set_pixel()  // set_pixel(led_value)
+					.pop(1)
+				})
+				.if_not_zero(|r| {
+					r.peek(1)
+					.push(0x00FF0000)
+					.or()
+					.set_pixel()
+					.pop(1)
+				})
+				.pop(1)
+			})
+			.blit()
+			.pop(1)
+			.r#yield()
+		});
+
+	println!("Program:\n{:?}", program);
 
 	// Read configuration file
 	let config_file = matches.value_of("config").unwrap_or("config.toml");
@@ -83,7 +119,7 @@ fn main() -> std::io::Result<()> {
 
 				// Decode message
 				match Message::from_buffer(&buf[0..amt], secret) {
-					Err(t) => println!("{} error {:?} (size={}b)", source_address, t, amt),
+					Err(t) => println!("{} error {:?} (size={}b source={} secret={:?})", source_address, t, amt, mac, secret),
 					Ok(m) => {
 						println!("{} @ {}: {:?} t={}", mac.to_canonical(), source_address, m.message_type, m.unix_time);
 
@@ -92,13 +128,26 @@ fn main() -> std::io::Result<()> {
 								let pong = Message {
 									message_type: MessageType::Pong,
 									unix_time: m.unix_time,
-									mac_address: MacAddress::nil()
+									mac_address: MacAddress::nil(),
+									payload: None
 								};
 
 								// Check deserialize
 								Message::from_buffer(&pong.signed(secret), secret).expect("deserialize own message");
 
 								match socket.send_to(&pong.signed(secret), source_address) {
+									Err(t) => println!("Send pong failed: {:?}", t),
+									Ok(_) => {}
+								};
+
+								let run = Message {
+									message_type: MessageType::Run,
+									unix_time: m.unix_time,
+									mac_address: MacAddress::nil(),
+									payload: Some(program.code.clone())
+								};
+
+								match socket.send_to(&run.signed(secret), source_address) {
 									Err(t) => println!("Send pong failed: {:?}", t),
 									Ok(_) => {}
 								}

@@ -1,0 +1,479 @@
+use std::io::{Write};
+use std::fmt;
+
+#[allow(dead_code)]
+enum Prefix {
+	POP = 0x0,
+	PUSHB = 0x10,
+	PEEK = 0x20,
+	PUSHI = 0x30,
+	JMP = 0x40,
+	JZ = 0x50,
+	JNZ = 0x60,
+	UNARY = 0x70,
+	BINARY = 0x80,
+	USER = 0xE0,
+	SPECIAL = 0xF0
+}
+
+impl Prefix {
+	fn from(code: u8) -> Option<Prefix> {
+		match code & 0xF0 {
+			0x0 => Some(Prefix::POP),
+			0x10 => Some(Prefix::PUSHB),
+			0x20 => Some(Prefix::PEEK),
+			0x30 => Some(Prefix::PUSHI),
+			0x40 => Some(Prefix::JMP),
+			0x50 => Some(Prefix::JZ),
+			0x60 => Some(Prefix::JNZ),
+			0x70 => Some(Prefix::UNARY),
+			0x80 => Some(Prefix::BINARY),
+			0xE0 => Some(Prefix::USER),
+			0xF0 => Some(Prefix::SPECIAL),
+			_ => None
+		}
+	}
+}
+
+impl std::fmt::Display for Prefix {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", match self {
+			Prefix::POP => "POP",
+			Prefix::PUSHB => "PUSHB",
+			Prefix::PEEK => "PEEKB",
+			Prefix::PUSHI => "PUSHI",
+			Prefix::JMP => "JMP",
+			Prefix::JZ => "JZ",
+			Prefix::JNZ => "JNZ",
+			Prefix::UNARY => "UNARY",
+			Prefix::BINARY => "BINARY",
+			Prefix::USER => "USER",
+			Prefix::SPECIAL => "SPECIAL"
+		})
+	}
+}
+
+#[allow(dead_code, non_camel_case_types)]
+enum JumpCondition {
+	UNCONDITIONAL = 0,
+	IF_ZERO = 1,
+	IF_NON_ZERO = 2
+}
+
+#[allow(dead_code)]
+enum Special {
+	SWAP = 12,
+	DUMP = 13,
+	YIELD = 14,
+	TWOBYTE = 15
+}
+
+#[allow(dead_code)]
+enum Unary {
+	INC = 0,
+	DEC = 1,
+	NOT = 2,
+	NEG = 3
+}
+
+impl Unary {
+	fn from(code: u8) -> Option<Unary> {
+		match code {
+			0 => Some(Unary::INC),
+			1 => Some(Unary::DEC),
+			2 => Some(Unary::NOT),
+			3 => Some(Unary::NEG),
+			_ => None
+		}
+	}
+}
+
+impl std::fmt::Display for Unary {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", match self {
+			Unary::INC => "INC",
+			Unary::DEC => "DEC",
+			Unary::NOT => "NOT",
+			Unary::NEG => "NEG"
+		})
+	}
+}
+
+#[allow(dead_code)]
+enum Binary {
+	ADD = 0,
+	SUB = 1,
+	DIV = 2,
+	MUL = 3,
+	MOD = 4,
+	AND = 5,
+	OR = 6,
+	XOR = 7,
+	GT = 8,
+	GTE = 9,
+	LT = 10,
+	LTE = 11
+}
+
+impl Binary {
+	fn from(code: u8) -> Option<Binary> {
+		match code {
+			0 => Some(Binary::ADD),
+			1 => Some(Binary::SUB),
+			2 => Some(Binary::DIV),
+			3 => Some(Binary::MUL),
+			4 => Some(Binary::MOD),
+			5 => Some(Binary::AND),
+			6 => Some(Binary::OR),
+			7 => Some(Binary::XOR),
+			8 => Some(Binary::GT),
+			9 => Some(Binary::GTE),
+			10 => Some(Binary::LT),
+			11 => Some(Binary::LTE),
+			_ => None
+		}
+	}
+}
+
+impl std::fmt::Display for Binary {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", match self {
+			Binary::ADD => "ADD",
+			Binary::SUB => "SUB",
+			Binary::DIV => "DIV",
+			Binary::MUL => "MUL",
+			Binary::MOD => "MOD",
+			Binary::AND => "AND",
+			Binary::OR => "OR",
+			Binary::XOR => "XOR",
+			Binary::GT => "GT",
+			Binary::GTE => "GTE",
+			Binary::LT => "LT",
+			Binary::LTE => "LTE"
+		})
+	}
+}
+
+#[allow(dead_code, non_camel_case_types)]
+enum UserCommand {
+	GET_LENGTH = 0,
+	GET_WALL_TIME = 1,
+	GET_PRECISE_TIME = 2,
+	SET_PIXEL = 3,
+	BLIT = 4
+}
+
+pub struct Program {
+	pub(crate) code: Vec<u8>,
+	pub(crate) stack_size: i32,
+	pub(crate) offset: usize
+}
+
+#[allow(dead_code)]
+impl Program {
+	fn write(&mut self, buffer: &[u8]) -> &mut Program {
+		self.code.write(buffer).unwrap();
+		self
+	}
+
+	pub fn new() -> Program {
+		Program { code: Vec::<u8>::new(), stack_size: 0, offset: 0 }
+	}
+
+	pub fn nop(&mut self) -> &mut Program {
+		self.write(&[Prefix::POP as u8 | 0x00]) // POP 0
+	}
+
+	pub fn pop(&mut self, n: u8) -> &mut Program {
+		assert!(n <= 15, "cannot pop more than 15 stack items");
+		self.stack_size -= n as i32;
+		self.write(&[Prefix::POP as u8 | n]) // POP n
+	}
+
+	pub fn peek(&mut self, n: u8) -> &mut Program {
+		assert!(n <= 15, "cannot peek more than 15 stack items");
+		self.stack_size += 1;
+		self.write(&[Prefix::PEEK as u8 | n]) // PEEK n
+	}
+
+	fn unary(&mut self, u: Unary) -> &mut Program {
+		self.write(&[Prefix::UNARY as u8 | u as u8]) // UNARY u
+	}
+
+	fn binary(&mut self, u: Binary) -> &mut Program {
+		self.stack_size -= 1;
+		self.write(&[Prefix::BINARY as u8 | u as u8]) // BINARY u
+	}
+
+	fn special(&mut self, u: Special) -> &mut Program {
+		self.stack_size += match u {
+			Special::DUMP => 0,
+			Special::SWAP => 0,
+			Special::YIELD => 0,
+			Special::TWOBYTE => 0
+		};
+		self.write(&[Prefix::SPECIAL as u8 | u as u8]) // SPECIAL u
+	}
+
+	fn user(&mut self, u: UserCommand) -> &mut Program {
+		self.stack_size += match u {
+			UserCommand::GET_LENGTH => 1,
+			UserCommand::GET_PRECISE_TIME => 1,
+			UserCommand::GET_WALL_TIME => 1,
+			UserCommand::BLIT => 0,
+			UserCommand::SET_PIXEL => 0
+		};
+		self.write(&[Prefix::USER as u8 | u as u8]) // SPECIAL u
+	}
+
+	fn skip<F>(&mut self, prefix: Prefix, mut builder: F) -> &mut Program where F: FnMut(&mut Program) -> &mut Program {
+		let mut fragment = Program { code: Vec::<u8>::new(), stack_size: 0, offset: self.current_pc() };
+		builder(&mut fragment);
+		assert!(fragment.stack_size == 0, "fragment in branch cannot modify stack size");
+
+		// Always write three-byte jumps for now
+		let address = self.current_pc() + 3 + fragment.code.len();
+		self.write(&[
+			prefix as u8,
+			(address & 0xFF) as u8,
+			((address  >> 8) & 0xFF) as u8
+		]);
+		self.write(&fragment.code)
+	}
+
+	pub fn if_zero<F>(&mut self, builder: F) -> &mut Program where F: FnMut(&mut Program) -> &mut Program {
+		self.skip(Prefix::JNZ, builder)
+	}
+
+	pub fn if_not_zero<F>(&mut self, builder: F) -> &mut Program where F: FnMut(&mut Program) -> &mut Program {
+		self.skip(Prefix::JZ, builder)
+	}
+
+	pub fn repeat_forever<F>(&mut self, mut builder: F) -> &mut Program where F: FnMut(&mut Program) -> &mut Program {
+		let mut fragment = Program { code: Vec::<u8>::new(), stack_size: 0, offset: self.current_pc() };
+		builder(&mut fragment);
+		assert!(fragment.stack_size == 0, "fragment in loop cannot modify stack size");
+
+		let start = self.current_pc();
+		self.write(&fragment.code);
+		self.write(&[
+			Prefix::JMP as u8,
+			(start & 0xFF) as u8,
+			((start  >> 8) & 0xFF) as u8
+		]);
+		self
+	}
+
+	fn current_pc(&self) -> usize {
+		self.offset + self.code.len()
+	}
+
+	pub fn repeat<F>(&mut self, mut builder: F) -> &mut Program where F: FnMut(&mut Program) -> &mut Program {
+		let mut fragment = Program { code: Vec::<u8>::new(), stack_size: 0, offset: self.current_pc() };
+		builder(&mut fragment);
+		assert!(fragment.stack_size == 0, "fragment in loop cannot modify stack size");
+
+		let start = self.current_pc();
+		self.write(&fragment.code);
+		self.write(&[Prefix::UNARY as u8 | Unary::DEC as u8]);
+		self.write(&[
+			Prefix::JNZ as u8,
+			(start & 0xFF) as u8,
+			((start  >> 8) & 0xFF) as u8
+		]);
+		self
+	}
+
+	pub fn repeat_times<F>(&mut self, times: u32, builder: F) -> &mut Program where F: FnMut(&mut Program) -> &mut Program {
+		self.push(times);
+		self.repeat(builder);
+		self.pop(1)
+	}
+
+	pub fn inc(&mut self) -> &mut Program {
+		self.unary(Unary::INC)
+	}
+
+	pub fn dec(&mut self) -> &mut Program {
+		self.unary(Unary::DEC)
+	}
+
+	pub fn not(&mut self) -> &mut Program {
+		self.unary(Unary::NOT)
+	}
+
+	pub fn neg(&mut self) -> &mut Program {
+		self.unary(Unary::NEG)
+	}
+
+	pub fn add(&mut self) -> &mut Program {
+		self.binary(Binary::ADD)
+	}
+
+	pub fn and(&mut self) -> &mut Program {
+		self.binary(Binary::AND)
+	}
+
+	pub fn div(&mut self) -> &mut Program {
+		self.binary(Binary::DIV)
+	}
+
+	pub fn gt(&mut self) -> &mut Program {
+		self.binary(Binary::GT)
+	}
+
+	pub fn gte(&mut self) -> &mut Program {
+		self.binary(Binary::GTE)
+	}
+
+	pub fn lt(&mut self) -> &mut Program {
+		self.binary(Binary::LT)
+	}
+
+	pub fn lte(&mut self) -> &mut Program {
+		self.binary(Binary::LTE)
+	}
+
+	pub fn r#mod(&mut self) -> &mut Program {
+		self.binary(Binary::MOD)
+	}
+
+	pub fn mul(&mut self) -> &mut Program {
+		self.binary(Binary::MUL)
+	}
+
+	pub fn or(&mut self) -> &mut Program {
+		self.binary(Binary::OR)
+	}
+
+	pub fn sub(&mut self) -> &mut Program {
+		self.binary(Binary::SUB)
+	}
+
+	pub fn xor(&mut self) -> &mut Program {
+		self.binary(Binary::XOR)
+	}
+
+	pub fn dump(&mut self) -> &mut Program {
+		self.special(Special::DUMP)
+	}
+
+	pub fn dup(&mut self) -> &mut Program {
+		self.peek(0)
+	}
+
+	pub fn swap(&mut self) -> &mut Program {
+		self.special(Special::SWAP)
+	}
+
+	pub fn r#yield(&mut self) -> &mut Program {
+		self.special(Special::YIELD)
+	}
+
+	pub fn set_pixel(&mut self) -> &mut Program {
+		self.user(UserCommand::SET_PIXEL)
+	}
+
+	pub fn blit(&mut self) -> &mut Program {
+		self.user(UserCommand::BLIT)
+	}
+
+	pub fn get_length(&mut self) -> &mut Program {
+		self.user(UserCommand::GET_LENGTH)
+	}
+
+	pub fn get_precise_time(&mut self) -> &mut Program {
+		self.user(UserCommand::GET_PRECISE_TIME)
+	}
+
+	pub fn get_wall_time(&mut self) -> &mut Program {
+		self.user(UserCommand::GET_WALL_TIME)
+	}
+
+	pub fn push(&mut self, b: u32) -> &mut Program {
+		self.stack_size += 1;
+		match b {
+			0 => self.code.write(&[Prefix::PUSHB as u8 | 0x00]).unwrap(),
+			_ if b <= 0xFF => self.code.write(&[Prefix::PUSHB as u8 | 0x01, b as u8]).unwrap(),
+			_ => self.code.write(
+					&[Prefix::PUSHI as u8 | 0x01,
+					(b & 0xFF) as u8,
+					((b >> 8) & 0xFF) as u8,
+					((b >> 16) & 0xFF) as u8,
+					((b >> 24) & 0xFF) as u8
+				]).unwrap()
+		};
+		self
+	}
+}
+
+impl fmt::Debug for Program {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let mut pc = 0;
+		while pc < self.code.len() {
+			let ins = Prefix::from(self.code[pc]);
+			if let Some(i) = ins {
+				let postfix = self.code[pc] & 0x0F;
+				write!(f, "{:04}.\t{:02x}\t{}", pc, self.code[pc], i)?;
+				match i {
+					Prefix::PUSHI => {
+						write!(f, "\t{:02x?}", &self.code[(pc+1)..(pc + 1 + (postfix as usize) * 4)])?;
+						pc += (postfix as usize) * 4;
+					},
+					Prefix::PUSHB => {
+						if postfix == 0 {
+							write!(f, "\t0")?;
+						}
+						else {
+							write!(f, "\t{:02x?}", &self.code[(pc+1)..(pc + 1 + (postfix as usize) * 4)])?;
+							pc += postfix as usize;
+						}
+					},
+					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
+						let target = (self.code[pc + 1] as u32) | (self.code[pc + 2] as u32) << 8;
+						write!(f, "\tto {}", target)?;
+						pc += 2
+					},
+					Prefix::BINARY => {
+						if let Some(op) = Binary::from(postfix) {
+							write!(f, "\t{}", op)?;
+						}
+						else {
+							write!(f, "\tunknown {}", postfix)?;
+						}
+					},
+					Prefix::UNARY => {
+						if let Some(op) = Unary::from(postfix) {
+							write!(f, "\t{}", op)?;
+						}
+						else {
+							write!(f, "\tunknown {}", postfix)?;
+						}
+					},
+					Prefix::USER => {
+						let name = match postfix {
+							0 => "get_length",
+							1 => "get_wall_time",
+							2=> "get_precise_time",
+							3 => "set_pixel",
+							4 => "blit",
+							_ => "(unknown user function)"
+						};
+						write!(f, "\t{}", name)?;
+					}
+					_ => {
+						write!(f, "\t{}", postfix)?;
+					}
+				}
+				write!(f, "\n")?;
+			}
+			else {
+				write!(f, "{:04}.\t{:02x}\tUnknown instruction\n", pc, self.code[pc])?;
+				break;
+			}
+
+			pc += 1;
+		}
+		Ok(())
+	}
+}
