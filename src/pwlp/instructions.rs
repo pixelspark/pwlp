@@ -67,7 +67,9 @@ pub enum Unary {
 	INC = 0,
 	DEC = 1,
 	NOT = 2,
-	NEG = 3
+	NEG = 3,
+	SHL8 = 4,
+	SHR8 = 5
 }
 
 impl Unary {
@@ -77,6 +79,8 @@ impl Unary {
 			1 => Some(Unary::DEC),
 			2 => Some(Unary::NOT),
 			3 => Some(Unary::NEG),
+			4 => Some(Unary::SHL8),
+			5 => Some(Unary::SHR8),
 			_ => None
 		}
 	}
@@ -88,7 +92,9 @@ impl std::fmt::Display for Unary {
 			Unary::INC => "INC",
 			Unary::DEC => "DEC",
 			Unary::NOT => "NOT",
-			Unary::NEG => "NEG"
+			Unary::NEG => "NEG",
+			Unary::SHL8 => "SHL8",
+			Unary::SHR8 => "SHR8"
 		})
 	}
 }

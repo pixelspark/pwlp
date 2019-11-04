@@ -14,7 +14,7 @@ use super::program::{Program};
 enum Node {
 	Expression(Expression),
 	Special(instructions::Special),
-	UserCall(instructions::UserCommand, Expression),
+	UserCall(instructions::UserCommand, Vec<Expression>),
 	User(instructions::UserCommand),
 	Statements(Vec<Node>),
 	Loop(Vec<Node>),
@@ -35,7 +35,24 @@ impl Node {
 				program.user(*s);
 			},
 			Node::UserCall(s, e) => {
-				e.assemble(program);
+				match s {
+					instructions::UserCommand::SET_PIXEL => {
+						let mut n = 0;
+						for param in e.iter() {
+							param.assemble(program);
+							for _ in 0..n {
+								program.unary(instructions::Unary::SHL8);
+							}
+							program.or();
+							n += 1;
+						}
+					},
+					_ => {
+						for param in e.iter() {
+							param.assemble(program);
+						}
+					}
+				}
 				program.user(*s);
 				program.pop(1);
 			},
@@ -209,13 +226,37 @@ fn multiplication(input: &str) -> IResult<&str, Expression> {
 	let (input, init) = term(input)?;
 
 	fold_many0(
-		pair(alt((tag("*"), tag("/"), tag("%"))), term),
+		pair(alt((tag("*"), tag("/"), tag("%"), tag("<<"), tag(">>"))), term),
 		init,
 		| acc, (op, val): (&str, Expression) | {
 			match op {
 				"*" => Expression::Binary(Box::new(acc), instructions::Binary::MUL, Box::new(val)),
 				"/" => Expression::Binary(Box::new(acc), instructions::Binary::DIV, Box::new(val)),
 				"%" => Expression::Binary(Box::new(acc), instructions::Binary::MOD, Box::new(val)),
+				"<<" | ">>" => {
+					if let Expression::Literal(n) = val {
+						let unary = match op {
+							"<<" => instructions::Unary::SHL8,
+							">>" => instructions::Unary::SHR8,
+							_ => unreachable!()
+						};
+
+						if (n % 8) == 0 {
+							let times = n / 8;
+							let mut expr = acc;
+							for _ in 0..times {
+								expr = Expression::Unary(unary, Box::new(expr))
+							}
+							expr
+						}
+						else {
+							panic!("cannot shift by other quantities than multiples of 8")
+						}
+					}
+					else {
+						panic!("cannot shift by dynamic quantities")
+					}
+				},
 				_ => unreachable!()
 			}
 		}
@@ -241,7 +282,16 @@ fn user_statement(input: &str) -> IResult<&str, Node> {
 	alt((
 		map(tag("blit"), |_| Node::User(instructions::UserCommand::BLIT)),
 		map(tuple((tag("set_pixel("), expression, tag(")"))), |t| {
-			Node::UserCall(instructions::UserCommand::SET_PIXEL, t.1)
+			Node::UserCall(instructions::UserCommand::SET_PIXEL, vec![t.1])
+		}),
+		// set_pixel(i, r, g, b)
+		map(tuple((tag("set_pixel("), expression, tag(","), expression, tag(","), expression, tag(","), expression, tag(")"))), |t| {
+			Node::UserCall(instructions::UserCommand::SET_PIXEL, vec![
+				t.1,
+				t.3,
+				t.5,
+				t.7
+			])
 		})
 	))(input)
 }
