@@ -7,109 +7,9 @@ use nom::{
 	sequence::{pair, preceded, tuple, terminated}
 };
 
+use super::ast::{Expression, Node, Scope};
 use super::instructions;
 use super::program::{Program};
-
-#[derive(Clone, Debug, PartialEq)]
-enum Node {
-	Expression(Expression),
-	Special(instructions::Special),
-	UserCall(instructions::UserCommand, Vec<Expression>),
-	User(instructions::UserCommand),
-	Statements(Vec<Node>),
-	Loop(Vec<Node>),
-	If(Expression, Vec<Node>)
-}
-
-impl Node {
-	fn assemble(&self, program: &mut Program) {
-		match self {
-			Node::Expression(e) => {
-				e.assemble(program);
-				program.pop(1);
-			},
-			Node::Special(s) => {
-				program.special(*s);
-			},
-			Node::User(s) => {
-				program.user(*s);
-			},
-			Node::UserCall(s, e) => {
-				match s {
-					instructions::UserCommand::SET_PIXEL => {
-						let mut n = 0;
-						for param in e.iter() {
-							param.assemble(program);
-							for _ in 0..n {
-								program.unary(instructions::Unary::SHL8);
-							}
-							program.or();
-							n += 1;
-						}
-					},
-					_ => {
-						for param in e.iter() {
-							param.assemble(program);
-						}
-					}
-				}
-				program.user(*s);
-				program.pop(1);
-			},
-			Node::Statements(stmts) => {
-				for i in stmts.iter() {
-					i.assemble(program);
-				}
-			},
-			Node::Loop(stmts) => {
-				program.repeat_forever(move |q| {
-					for i in stmts.iter() {
-						i.assemble(q);
-					};
-				});
-			},
-			Node::If(e, ss) => {
-				e.assemble(program);
-				program.if_not_zero(move |q| {
-					for i in ss.iter() {
-						i.assemble(q);
-					};
-				});
-				program.pop(1);
-			}
-		}
-	}
-}
-
-#[derive(Clone, Debug, PartialEq)]
-enum Expression {
-	Literal(u32),
-	Unary(instructions::Unary, Box<Expression>),
-	Binary(Box<Expression>, instructions::Binary, Box<Expression>),
-	User(instructions::UserCommand)
-}
-
-impl Expression {
-	fn assemble(&self, program: &mut Program) {
-		match self {
-			Expression::Literal(u) => {
-				program.push(*u);
-			},
-			Expression::User(s) => {
-				program.user(*s);
-			},
-			Expression::Unary(op, rhs) => {
-				rhs.assemble(program);
-				program.unary(*op);
-			},
-			Expression::Binary(lhs, op, rhs) => {
-				lhs.assemble(program);
-				rhs.assemble(program);
-				program.binary(*op);
-			}
-		}
-	}
-}
 
 fn from_hex(input: &str) -> Result<u32, std::num::ParseIntError> {
 	u32::from_str_radix(input, 16)
@@ -140,6 +40,10 @@ fn dec_number(input: &str) -> IResult<&str, u32> {
 	map_res(take_while1(is_dec_digit), from_dec)(input)
 }
 
+fn variable_name(input: &str) -> IResult<&str, &str> {
+	take_while1(|c: char| c.is_alphabetic())(input)
+}
+
 fn hex_literal(input: &str) -> IResult<&str, u32> {
 	let (input, _) = tag("0x")(input)?;
 	let (input, num) = hex_number(input)?;
@@ -151,8 +55,14 @@ fn literal(input: &str) -> IResult<&str, Expression> {
 	Ok((input, Expression::Literal(res)))
 }
 
+fn load_expression(input: &str) -> IResult<&str, Expression> {
+	map(variable_name, |v| {
+		Expression::Load(v.to_string())
+	})(input)
+}
+
 fn term(input: &str) -> IResult<&str, Expression> {
-	alt((literal, user_expression))(input)
+	alt((literal, user_expression, load_expression))(input)
 }
 
 fn comparison(input: &str) -> IResult<&str, Expression> {
@@ -327,8 +237,14 @@ fn loop_statement(input: &str) -> IResult<&str, Node> {
 	})(input)
 }
 
+fn assigment_statement(input: &str) -> IResult<&str, Node> {
+	map(tuple((variable_name, tag("="), expression)), |t| {
+		Node::Assignment(t.0.to_string(), t.2)
+	})(input)
+}
+
 fn statement(input: &str) -> IResult<&str, Node> {
-	alt((if_statement, loop_statement, expression_statement, user_statement, special_statement))(input)
+	alt((user_statement, special_statement, assigment_statement, if_statement, loop_statement, expression_statement))(input)
 }
 
 fn program(input: &str) -> IResult<&str, Node> {
@@ -346,7 +262,9 @@ pub fn parse(source: &str) -> Result<Program, String> {
 			}
 			else {
 				let mut p = Program::new();
-				n.assemble(&mut p);
+				let mut scope = Scope::new();
+				n.assemble(&mut p, &mut scope);
+				scope.assemble_teardown(&mut p);
 				Ok(p)
 			}
 		},
@@ -370,7 +288,9 @@ mod tests {
 		if let Ok((remainder, n)) = program("loop{if(1+2*3>4){yield};\ndump}") {
 			assert_eq!(remainder, "");
 			let mut program = Program::new();
-			n.assemble(&mut program);
+			let mut scope = Scope::new();
+			n.assemble(&mut program, &mut scope);
+			scope.assemble_teardown(&mut program);
 			println!("Program:\n{:?}", &mut program);
 		}
 	}

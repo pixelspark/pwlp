@@ -39,6 +39,8 @@ fn main() -> std::io::Result<()> {
 			.about("compiles a script to binary")
 			.arg(Arg::with_name("file").index(1).takes_value(true).help("the file to compile"))
 			.arg(Arg::with_name("output").index(2).takes_value(true)).help("the file to write the binary output to"))
+		.subcommand(SubCommand::with_name("run")
+			.about("run a script"))
 		.subcommand(SubCommand::with_name("serve")
 			.about("start server")
 			.arg(Arg::with_name("bind")
@@ -55,11 +57,23 @@ fn main() -> std::io::Result<()> {
 	let config: Config = toml::from_str(&config_string)?;
 
 	// Find out which subcommand to perform
+	if let Some(_matches) = matches.subcommand_matches("run") {
+		let mut source = String::new();
+		stdin().read_to_string(&mut source)?;
+
+		match parse(&source) {
+			Ok(prg) => {
+				println!("Program:\n{:?}", &prg);
+				println!("Run:");
+				prg.run();
+			},
+			Err(s) => println!("Error: {}", s)
+		};
+	}
 	if let Some(matches) = matches.subcommand_matches("compile") {
 		let mut source = String::new();
 		if let Some(source_file) = matches.value_of("file") {
 			File::open(source_file)?.read_to_string(&mut source)?;
-			println!("{}", source_file);
 		}
 		else {
 			stdin().read_to_string(&mut source)?;
@@ -67,7 +81,9 @@ fn main() -> std::io::Result<()> {
 			
 		match parse(&source) {
 			Ok(prg) => {
-				println!("Program:\n{:?}", &prg);
+				if !matches.is_present("output") {
+					println!("Program:\n{:?}", &prg);
+				}
 				if let Some(out_file) = matches.value_of("output") {
 					File::create(out_file)?.write(&prg.code)?;
 				}

@@ -101,7 +101,7 @@ impl std::fmt::Display for Unary {
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum Binary {
+pub enum Binary {
 	ADD = 0,
 	SUB = 1,
 	DIV = 2,

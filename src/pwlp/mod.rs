@@ -11,3 +11,9 @@ pub use protocol::*;
 
 pub mod parser;
 pub use parser::*;
+
+pub mod vm;
+pub use vm::*;
+
+pub mod ast;
+pub use ast::*;
