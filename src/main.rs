@@ -9,7 +9,7 @@ use pwlp::program::{Program};
 use pwlp::parser::parse;
 use serde::Deserialize;
 use std::fs::{File};
-use std::io::{Read, Write};
+use std::io::{Read, Write, stdin};
 use eui48::{MacAddress};
 
 #[derive(Deserialize, Debug, Clone)]
@@ -56,24 +56,24 @@ fn main() -> std::io::Result<()> {
 
 	// Find out which subcommand to perform
 	if let Some(matches) = matches.subcommand_matches("compile") {
+		let mut source = String::new();
 		if let Some(source_file) = matches.value_of("file") {
-			let mut source = String::new();
 			File::open(source_file)?.read_to_string(&mut source)?;
 			println!("{}", source_file);
-			
-			match parse(&source) {
-				Ok(prg) => {
-					println!("Program:\n{:?}", &prg);
-					if let Some(out_file) = matches.value_of("output") {
-						File::create(out_file)?.write(&prg.code)?;
-					}
-				},
-				Err(s) => println!("Error: {}", s)
-			};
 		}
 		else {
-			println!("No source file specified");
+			stdin().read_to_string(&mut source)?;
 		}
+			
+		match parse(&source) {
+			Ok(prg) => {
+				println!("Program:\n{:?}", &prg);
+				if let Some(out_file) = matches.value_of("output") {
+					File::create(out_file)?.write(&prg.code)?;
+				}
+			},
+			Err(s) => println!("Error: {}", s)
+		};
 	}
 	else if let Some(matches) = matches.subcommand_matches("serve") {
 		let mut program = Program::new();
