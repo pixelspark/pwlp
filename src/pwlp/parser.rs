@@ -68,7 +68,8 @@ impl Node {
 enum Expression {
 	Literal(u32),
 	Unary(instructions::Unary, Box<Expression>),
-	Binary(Box<Expression>, instructions::Binary, Box<Expression>)
+	Binary(Box<Expression>, instructions::Binary, Box<Expression>),
+	User(instructions::UserCommand)
 }
 
 impl Expression {
@@ -76,6 +77,9 @@ impl Expression {
 		match self {
 			Expression::Literal(u) => {
 				program.push(*u);
+			},
+			Expression::User(s) => {
+				program.user(*s);
 			},
 			Expression::Unary(op, rhs) => {
 				rhs.assemble(program);
@@ -131,7 +135,7 @@ fn literal(input: &str) -> IResult<&str, Expression> {
 }
 
 fn term(input: &str) -> IResult<&str, Expression> {
-	literal(input)
+	alt((literal, user_expression))(input)
 }
 
 fn comparison(input: &str) -> IResult<&str, Expression> {
@@ -236,12 +240,17 @@ fn special_statement(input: &str) -> IResult<&str, Node> {
 fn user_statement(input: &str) -> IResult<&str, Node> {
 	alt((
 		map(tag("blit"), |_| Node::User(instructions::UserCommand::BLIT)),
-		map(tag("get_length"), |_| Node::User(instructions::UserCommand::GET_LENGTH)),
-		map(tag("get_wall_time"), |_| Node::User(instructions::UserCommand::GET_WALL_TIME)),
-		map(tag("get_precise_time"), |_| Node::User(instructions::UserCommand::GET_PRECISE_TIME)),
 		map(tuple((tag("set_pixel("), expression, tag(")"))), |t| {
 			Node::UserCall(instructions::UserCommand::SET_PIXEL, t.1)
 		})
+	))(input)
+}
+
+fn user_expression(input: &str) -> IResult<&str, Expression> {
+	alt((
+		map(tag("get_length"), |_| Expression::User(instructions::UserCommand::GET_LENGTH)),
+		map(tag("get_wall_time"), |_| Expression::User(instructions::UserCommand::GET_WALL_TIME)),
+		map(tag("get_precise_time"), |_| Expression::User(instructions::UserCommand::GET_PRECISE_TIME))
 	))(input)
 }
 
