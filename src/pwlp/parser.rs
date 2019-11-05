@@ -215,7 +215,7 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 }
 
 fn if_statement(input: &str) -> IResult<&str, Node> {
-	map(tuple((tag("if("), expression, tag(")"), sp, tag("{"), program, tag("}"))), |t| {
+	map(tuple((tag("if("), preceded(sp, terminated(expression, sp)), tag(")"), sp, tag("{"), program, tag("}"))), |t| {
 		if let Node::Statements(ss) = t.5 {
 			Node::If(t.1, ss)
 		}
@@ -237,6 +237,17 @@ fn loop_statement(input: &str) -> IResult<&str, Node> {
 	})(input)
 }
 
+fn for_statement(input: &str) -> IResult<&str, Node> {
+	map(tuple((tag("for("), preceded(sp, terminated(variable_name, sp)), tag("="), preceded(sp, terminated(expression, sp)), tag(")"), sp, tag("{"), sp, program, sp, tag("}"))), |t| {
+		if let Node::Statements(ss) = t.8 {
+			Node::For(t.1.to_string(), t.3, ss)
+		}
+		else {
+			unreachable!()
+		}
+	})(input)
+}
+
 fn assigment_statement(input: &str) -> IResult<&str, Node> {
 	map(tuple((variable_name, tag("="), expression)), |t| {
 		Node::Assignment(t.0.to_string(), t.2)
@@ -244,7 +255,7 @@ fn assigment_statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn statement(input: &str) -> IResult<&str, Node> {
-	alt((user_statement, special_statement, assigment_statement, if_statement, loop_statement, expression_statement))(input)
+	alt((user_statement, special_statement, assigment_statement, if_statement, for_statement, loop_statement, expression_statement))(input)
 }
 
 fn program(input: &str) -> IResult<&str, Node> {

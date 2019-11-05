@@ -10,7 +10,8 @@ pub enum Node {
 	Statements(Vec<Node>),
 	Loop(Vec<Node>),
 	If(Expression, Vec<Node>),
-	Assignment(String, Expression)
+	Assignment(String, Expression),
+	For(String, Expression, Vec<Node>)
 }
 
 pub struct Scope {
@@ -79,6 +80,30 @@ impl Node {
 						i.assemble(q, scope);
 					};
 				});
+			},
+			Node::For(variable_name, expression, stmts) => {
+				if let Some(_) = scope.variables.iter().position(|r| r == variable_name) {
+					panic!("variable already defined")
+				}
+
+				expression.assemble(program, scope);
+				scope.variables.push(variable_name.clone());
+				scope.level -= 1;
+				program.repeat(|q| {
+					for i in stmts.iter() {
+						i.assemble(q, scope);
+					};
+				});
+				
+				// Undefine variable
+				if let Some(p) = scope.variables.iter().position(|r| r == variable_name) {
+					scope.variables.remove(p);
+				}
+				else {
+					panic!("variable already defined")
+				}
+				scope.level += 1;
+				program.pop(1);
 			},
 			Node::If(e, ss) => {
 				e.assemble(program, scope);

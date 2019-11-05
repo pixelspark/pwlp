@@ -1,0 +1,3 @@
+for(n=get_length){
+	set_pixel(n,255,0,0)
+}

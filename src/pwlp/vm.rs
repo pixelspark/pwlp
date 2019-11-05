@@ -10,11 +10,14 @@ impl Program {
 		let get_precise_time_result = 1337;
 		let get_wall_time_result = 1338;
 
+		let mut instruction_count = 0;
+
 		while pc < self.code.len() {
 			let ins = Prefix::from(self.code[pc]);
 			if let Some(i) = ins {
+				instruction_count += 1;
 				let postfix = self.code[pc] & 0x0F;
-				println!("{:04}.\t{:02x}\t{}", pc, self.code[pc], i);
+				print!("{:04}.\t{:02x}\t{}", pc, self.code[pc], i);
 
 				match i {
 					Prefix::PUSHI => {
@@ -24,7 +27,7 @@ impl Program {
 								(self.code[pc + 3] as u32) << 16 |
 								(self.code[pc + 4] as u32) << 24;
 							stack.push(value);
-							println!("\tPUSH {}", value);
+							print!("\tv={}", value);
 							pc += 4;
 						}
 					},
@@ -35,7 +38,7 @@ impl Program {
 						else {
 							for _ in 0..postfix {
 								pc += 1;
-								println!("\tPUSH {}", self.code[pc]);
+								print!("\tv={}", self.code[pc]);
 								stack.push(self.code[pc] as u32);
 							}
 						}
@@ -45,14 +48,19 @@ impl Program {
 							let _ = stack.pop();
 						}
 					},
+					Prefix::PEEK => {
+						let val = stack[stack.len() - (postfix as usize) - 1];
+						print!("\tindex={} v={}", postfix, val);
+						stack.push(val);
+					},
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
 						let target = ((self.code[pc + 1] as u32) | (self.code[pc + 2] as u32) << 8) as usize;
 
 						pc = match i {
 							Prefix::JMP => target,
 							Prefix::JZ => {
-								let head = stack.pop().unwrap();
-								if head == 0 {
+								let head = stack.last().unwrap();
+								if *head == 0 {
 									target
 								}
 								else {
@@ -60,16 +68,17 @@ impl Program {
 								}
 							},
 							Prefix::JNZ => {
-								let head = stack.pop().unwrap();
-								if head != 0 {
+								let head = stack.last().unwrap();
+								if *head != 0 {
 									target
 								}
 								else {
-									pc
+									pc + 3
 								}
 							},
 							_ => unreachable!()
 						};
+						println!("");
 						continue;
 					},
 					Prefix::BINARY => {
@@ -119,13 +128,18 @@ impl Program {
 							1 => stack.push(get_wall_time_result),
 							2=>  stack.push(get_precise_time_result),
 							3 => {
-								println!("set_pixel {}", stack.last().unwrap());
+								let v = stack.last().unwrap();
+								let idx = v & 0xFF;
+								let r = ((v >> 8) as u32) & 0xFF;
+								let g = ((v >> 16) as u32) & 0xFF;
+								let b = ((v >> 24) as u32) & 0xFF;
+								print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
 							},
 							4 => {
-								println!("blit")
+								print!("\tblit")
 							},
 							_ => {
-								println!("(unknown user function)");
+								print!("\t(unknown user function)");
 								break;
 							}
 						}
@@ -138,10 +152,7 @@ impl Program {
 							15 => "twobyte",
 							_ => unimplemented!()
 						};
-						println!("\t{}", name);
-					},
-					_ => {
-						println!("{:04}.\t{:02x}\tUnknown prefix\n", pc, self.code[pc]);
+						print!("\t{}", name);
 					}
 				}
 			}
@@ -150,8 +161,9 @@ impl Program {
 				break;
 			}
 
-			println!("\t\tstack: {:?}", stack);
+			println!("\tstack: {:?}", stack);
 			pc += 1;
 		}
+		println!("Ended; {} instructions executed", instruction_count);
 	}
 }
