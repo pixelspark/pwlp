@@ -12,7 +12,7 @@ pub enum Prefix {
 	UNARY = 0x70,
 	BINARY = 0x80,
 	USER = 0xE0,
-	SPECIAL = 0xF0
+	SPECIAL = 0xF0,
 }
 
 impl Prefix {
@@ -29,26 +29,30 @@ impl Prefix {
 			0x80 => Some(Prefix::BINARY),
 			0xE0 => Some(Prefix::USER),
 			0xF0 => Some(Prefix::SPECIAL),
-			_ => None
+			_ => None,
 		}
 	}
 }
 
 impl std::fmt::Display for Prefix {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", match self {
-			Prefix::POP => "POP",
-			Prefix::PUSHB => "PUSHB",
-			Prefix::PEEK => "PEEKB",
-			Prefix::PUSHI => "PUSHI",
-			Prefix::JMP => "JMP",
-			Prefix::JZ => "JZ",
-			Prefix::JNZ => "JNZ",
-			Prefix::UNARY => "UNARY",
-			Prefix::BINARY => "BINARY",
-			Prefix::USER => "USER",
-			Prefix::SPECIAL => "SPECIAL"
-		})
+		write!(
+			f,
+			"{}",
+			match self {
+				Prefix::POP => "POP",
+				Prefix::PUSHB => "PUSHB",
+				Prefix::PEEK => "PEEKB",
+				Prefix::PUSHI => "PUSHI",
+				Prefix::JMP => "JMP",
+				Prefix::JZ => "JZ",
+				Prefix::JNZ => "JNZ",
+				Prefix::UNARY => "UNARY",
+				Prefix::BINARY => "BINARY",
+				Prefix::USER => "USER",
+				Prefix::SPECIAL => "SPECIAL",
+			}
+		)
 	}
 }
 
@@ -58,7 +62,7 @@ pub enum Special {
 	SWAP = 12,
 	DUMP = 13,
 	YIELD = 14,
-	TWOBYTE = 15
+	TWOBYTE = 15,
 }
 
 #[allow(dead_code)]
@@ -69,7 +73,7 @@ pub enum Unary {
 	NOT = 2,
 	NEG = 3,
 	SHL8 = 4,
-	SHR8 = 5
+	SHR8 = 5,
 }
 
 impl Unary {
@@ -81,21 +85,25 @@ impl Unary {
 			3 => Some(Unary::NEG),
 			4 => Some(Unary::SHL8),
 			5 => Some(Unary::SHR8),
-			_ => None
+			_ => None,
 		}
 	}
 }
 
 impl std::fmt::Display for Unary {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", match self {
-			Unary::INC => "INC",
-			Unary::DEC => "DEC",
-			Unary::NOT => "NOT",
-			Unary::NEG => "NEG",
-			Unary::SHL8 => "SHL8",
-			Unary::SHR8 => "SHR8"
-		})
+		write!(
+			f,
+			"{}",
+			match self {
+				Unary::INC => "INC",
+				Unary::DEC => "DEC",
+				Unary::NOT => "NOT",
+				Unary::NEG => "NEG",
+				Unary::SHL8 => "SHL8",
+				Unary::SHR8 => "SHR8",
+			}
+		)
 	}
 }
 
@@ -113,7 +121,7 @@ pub enum Binary {
 	GT = 8,
 	GTE = 9,
 	LT = 10,
-	LTE = 11
+	LTE = 11,
 }
 
 impl Binary {
@@ -131,27 +139,31 @@ impl Binary {
 			9 => Some(Binary::GTE),
 			10 => Some(Binary::LT),
 			11 => Some(Binary::LTE),
-			_ => None
+			_ => None,
 		}
 	}
 }
 
 impl std::fmt::Display for Binary {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", match self {
-			Binary::ADD => "ADD",
-			Binary::SUB => "SUB",
-			Binary::DIV => "DIV",
-			Binary::MUL => "MUL",
-			Binary::MOD => "MOD",
-			Binary::AND => "AND",
-			Binary::OR => "OR",
-			Binary::XOR => "XOR",
-			Binary::GT => "GT",
-			Binary::GTE => "GTE",
-			Binary::LT => "LT",
-			Binary::LTE => "LTE"
-		})
+		write!(
+			f,
+			"{}",
+			match self {
+				Binary::ADD => "ADD",
+				Binary::SUB => "SUB",
+				Binary::DIV => "DIV",
+				Binary::MUL => "MUL",
+				Binary::MOD => "MOD",
+				Binary::AND => "AND",
+				Binary::OR => "OR",
+				Binary::XOR => "XOR",
+				Binary::GT => "GT",
+				Binary::GTE => "GTE",
+				Binary::LT => "LT",
+				Binary::LTE => "LTE",
+			}
+		)
 	}
 }
 
@@ -162,5 +174,5 @@ pub enum UserCommand {
 	GET_WALL_TIME = 1,
 	GET_PRECISE_TIME = 2,
 	SET_PIXEL = 3,
-	BLIT = 4
+	BLIT = 4,
 }

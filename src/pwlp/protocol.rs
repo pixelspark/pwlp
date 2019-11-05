@@ -1,8 +1,8 @@
-use hmacsha1::hmac_sha1;
 use byteorder::{LittleEndian, WriteBytesExt};
+use hmacsha1::hmac_sha1;
 
+use eui48::MacAddress;
 use std::convert::TryInto;
-use eui48::{MacAddress};
 
 #[derive(Debug)]
 #[repr(u8)]
@@ -11,7 +11,7 @@ pub enum MessageType {
 	Pong,
 	Set,
 	Run,
-	Unknown
+	Unknown,
 }
 
 impl MessageType {
@@ -21,7 +21,7 @@ impl MessageType {
 			0x02 => MessageType::Pong,
 			0x03 => MessageType::Set,
 			0x04 => MessageType::Run,
-			_ => MessageType::Unknown
+			_ => MessageType::Unknown,
 		}
 	}
 }
@@ -33,7 +33,7 @@ impl From<&MessageType> for u8 {
 			MessageType::Pong => 0x02,
 			MessageType::Set => 0x03,
 			MessageType::Run => 0x04,
-			_ => panic!("invalid message type")
+			_ => panic!("invalid message type"),
 		}
 	}
 }
@@ -42,7 +42,7 @@ impl From<&MessageType> for u8 {
 pub enum MessageError {
 	SignatureInvalid,
 	MessageTooShort,
-	MacAddressInvalid
+	MacAddressInvalid,
 }
 
 #[allow(dead_code)]
@@ -51,7 +51,7 @@ pub struct Message {
 	pub mac_address: MacAddress,
 	pub unix_time: u32,
 	pub message_type: MessageType,
-	pub payload: Option<Vec<u8>>
+	pub payload: Option<Vec<u8>>,
 }
 
 const SHA1_SIZE: usize = 20;
@@ -68,7 +68,7 @@ impl Message {
 
 		match MacAddress::from_bytes(&buffer[0..6]) {
 			Ok(m) => return Ok(m),
-			Err(()) => return Err(MessageError::MacAddressInvalid)
+			Err(()) => return Err(MessageError::MacAddressInvalid),
 		}
 	}
 
@@ -90,28 +90,32 @@ impl Message {
 		// MAC address
 		let mac_address = Message::peek_mac_address(buffer)?;
 		let type_number = buffer[(MAC_SIZE + TIME_SIZE)];
-		
+
 		let payload_size = data_size - MAC_SIZE - TIME_SIZE;
 
 		Ok(Message {
 			mac_address: mac_address,
-			unix_time: u32::from_le_bytes(buffer[MAC_SIZE..(MAC_SIZE + TIME_SIZE)].try_into().unwrap()),
+			unix_time: u32::from_le_bytes(
+				buffer[MAC_SIZE..(MAC_SIZE + TIME_SIZE)].try_into().unwrap(),
+			),
 			message_type: MessageType::from(type_number),
 			payload: match payload_size {
 				0 => None,
-				_ => Some(buffer[(buffer.len() - payload_size)..buffer.len()].to_vec())
-			}
+				_ => Some(buffer[(buffer.len() - payload_size)..buffer.len()].to_vec()),
+			},
 		})
 	}
 
 	pub fn signed(&self, key: &[u8]) -> Vec<u8> {
-		let data_size = MAC_SIZE + TIME_SIZE + MESSAGE_TYPE_SIZE + match &self.message_type {
-			MessageType::Ping => 0,
-			MessageType::Pong => 0,
-			_ => 0
-		} + match &self.payload {
+		let data_size = MAC_SIZE
+			+ TIME_SIZE + MESSAGE_TYPE_SIZE
+			+ match &self.message_type {
+				MessageType::Ping => 0,
+				MessageType::Pong => 0,
+				_ => 0,
+			} + match &self.payload {
 			None => 0,
-			Some(p) => p.len()
+			Some(p) => p.len(),
 		};
 		let mut buf = Vec::with_capacity(data_size + SHA1_SIZE);
 
@@ -126,6 +130,6 @@ impl Message {
 
 		let signature = hmac_sha1(key, &buf[0..data_size]);
 		buf.extend_from_slice(&signature);
-		return buf
+		return buf;
 	}
 }

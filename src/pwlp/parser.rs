@@ -1,15 +1,15 @@
 use nom::{
-	IResult,
-	bytes::complete::{tag, take_while1, take_while},
 	branch::alt,
+	bytes::complete::{tag, take_while, take_while1},
 	combinator::{map, map_res},
 	multi::{fold_many0, separated_list},
-	sequence::{pair, preceded, tuple, terminated}
+	sequence::{pair, preceded, terminated, tuple},
+	IResult,
 };
 
 use super::ast::{Expression, Node, Scope};
 use super::instructions;
-use super::program::{Program};
+use super::program::Program;
 
 fn from_hex(input: &str) -> Result<u32, std::num::ParseIntError> {
 	u32::from_str_radix(input, 16)
@@ -56,9 +56,7 @@ fn literal(input: &str) -> IResult<&str, Expression> {
 }
 
 fn load_expression(input: &str) -> IResult<&str, Expression> {
-	map(variable_name, |v| {
-		Expression::Load(v.to_string())
-	})(input)
+	map(variable_name, |v| Expression::Load(v.to_string()))(input)
 }
 
 fn term(input: &str) -> IResult<&str, Expression> {
@@ -71,31 +69,25 @@ fn comparison(input: &str) -> IResult<&str, Expression> {
 	fold_many0(
 		pair(alt((tag(">="), tag("<="), tag(">"), tag("<"))), unaries),
 		init,
-		| acc, (op, val): (&str, Expression) | {
-			match op {
-				">=" => Expression::Binary(Box::new(acc), instructions::Binary::GTE, Box::new(val)),
-				"<=" => Expression::Binary(Box::new(acc), instructions::Binary::LTE, Box::new(val)),
-				">" => Expression::Binary(Box::new(acc), instructions::Binary::GT, Box::new(val)),
-				"<" => Expression::Binary(Box::new(acc), instructions::Binary::LT, Box::new(val)),
-				_ => unreachable!()
-			}
-		}
+		|acc, (op, val): (&str, Expression)| match op {
+			">=" => Expression::Binary(Box::new(acc), instructions::Binary::GTE, Box::new(val)),
+			"<=" => Expression::Binary(Box::new(acc), instructions::Binary::LTE, Box::new(val)),
+			">" => Expression::Binary(Box::new(acc), instructions::Binary::GT, Box::new(val)),
+			"<" => Expression::Binary(Box::new(acc), instructions::Binary::LT, Box::new(val)),
+			_ => unreachable!(),
+		},
 	)(input)
 }
 
 fn unaries(input: &str) -> IResult<&str, Expression> {
 	alt((
-		map(pair(
-			alt((tag("-"), tag("!"))),
-			unaries
-		), |t| {
-			match t.0 {
-				"-" => Expression::Unary(instructions::Unary::NEG, Box::new(t.1)),
-				"!" => Expression::Unary(instructions::Unary::NOT, Box::new(t.1)),
-				_ => unreachable!()
-			}
-		}), 
-	binaries))(input)
+		map(pair(alt((tag("-"), tag("!"))), unaries), |t| match t.0 {
+			"-" => Expression::Unary(instructions::Unary::NEG, Box::new(t.1)),
+			"!" => Expression::Unary(instructions::Unary::NOT, Box::new(t.1)),
+			_ => unreachable!(),
+		}),
+		binaries,
+	))(input)
 }
 
 fn binaries(input: &str) -> IResult<&str, Expression> {
@@ -104,14 +96,12 @@ fn binaries(input: &str) -> IResult<&str, Expression> {
 	fold_many0(
 		pair(alt((tag("|"), tag("^"), tag("&"))), addition),
 		init,
-		| acc, (op, val): (&str, Expression) | {
-			match op {
-				"&" => Expression::Binary(Box::new(acc), instructions::Binary::AND, Box::new(val)),
-				"|" => Expression::Binary(Box::new(acc), instructions::Binary::OR, Box::new(val)),
-				"^" => Expression::Binary(Box::new(acc), instructions::Binary::XOR, Box::new(val)),
-				_ => unreachable!()
-			}
-		}
+		|acc, (op, val): (&str, Expression)| match op {
+			"&" => Expression::Binary(Box::new(acc), instructions::Binary::AND, Box::new(val)),
+			"|" => Expression::Binary(Box::new(acc), instructions::Binary::OR, Box::new(val)),
+			"^" => Expression::Binary(Box::new(acc), instructions::Binary::XOR, Box::new(val)),
+			_ => unreachable!(),
+		},
 	)(input)
 }
 
@@ -121,14 +111,13 @@ fn addition(input: &str) -> IResult<&str, Expression> {
 	fold_many0(
 		pair(alt((tag("+"), tag("-"))), multiplication),
 		init,
-		| acc, (op, val): (&str, Expression) | {
-			if op  == "+" {
+		|acc, (op, val): (&str, Expression)| {
+			if op == "+" {
 				Expression::Binary(Box::new(acc), instructions::Binary::ADD, Box::new(val))
-			}
-			else {
+			} else {
 				Expression::Binary(Box::new(acc), instructions::Binary::SUB, Box::new(val))
 			}
-		}
+		},
 	)(input)
 }
 
@@ -136,40 +125,39 @@ fn multiplication(input: &str) -> IResult<&str, Expression> {
 	let (input, init) = term(input)?;
 
 	fold_many0(
-		pair(alt((tag("*"), tag("/"), tag("%"), tag("<<"), tag(">>"))), term),
+		pair(
+			alt((tag("*"), tag("/"), tag("%"), tag("<<"), tag(">>"))),
+			term,
+		),
 		init,
-		| acc, (op, val): (&str, Expression) | {
-			match op {
-				"*" => Expression::Binary(Box::new(acc), instructions::Binary::MUL, Box::new(val)),
-				"/" => Expression::Binary(Box::new(acc), instructions::Binary::DIV, Box::new(val)),
-				"%" => Expression::Binary(Box::new(acc), instructions::Binary::MOD, Box::new(val)),
-				"<<" | ">>" => {
-					if let Expression::Literal(n) = val {
-						let unary = match op {
-							"<<" => instructions::Unary::SHL8,
-							">>" => instructions::Unary::SHR8,
-							_ => unreachable!()
-						};
+		|acc, (op, val): (&str, Expression)| match op {
+			"*" => Expression::Binary(Box::new(acc), instructions::Binary::MUL, Box::new(val)),
+			"/" => Expression::Binary(Box::new(acc), instructions::Binary::DIV, Box::new(val)),
+			"%" => Expression::Binary(Box::new(acc), instructions::Binary::MOD, Box::new(val)),
+			"<<" | ">>" => {
+				if let Expression::Literal(n) = val {
+					let unary = match op {
+						"<<" => instructions::Unary::SHL8,
+						">>" => instructions::Unary::SHR8,
+						_ => unreachable!(),
+					};
 
-						if (n % 8) == 0 {
-							let times = n / 8;
-							let mut expr = acc;
-							for _ in 0..times {
-								expr = Expression::Unary(unary, Box::new(expr))
-							}
-							expr
+					if (n % 8) == 0 {
+						let times = n / 8;
+						let mut expr = acc;
+						for _ in 0..times {
+							expr = Expression::Unary(unary, Box::new(expr))
 						}
-						else {
-							panic!("cannot shift by other quantities than multiples of 8")
-						}
+						expr
+					} else {
+						panic!("cannot shift by other quantities than multiples of 8")
 					}
-					else {
-						panic!("cannot shift by dynamic quantities")
-					}
-				},
-				_ => unreachable!()
+				} else {
+					panic!("cannot shift by dynamic quantities")
+				}
 			}
-		}
+			_ => unreachable!(),
+		},
 	)(input)
 }
 
@@ -183,8 +171,10 @@ fn expression_statement(input: &str) -> IResult<&str, Node> {
 
 fn special_statement(input: &str) -> IResult<&str, Node> {
 	alt((
-		map(tag("yield"), |_| Node::Special(instructions::Special::YIELD)),
-		map(tag("dump"), |_| Node::Special(instructions::Special::DUMP))
+		map(tag("yield"), |_| {
+			Node::Special(instructions::Special::YIELD)
+		}),
+		map(tag("dump"), |_| Node::Special(instructions::Special::DUMP)),
 	))(input)
 }
 
@@ -195,57 +185,99 @@ fn user_statement(input: &str) -> IResult<&str, Node> {
 			Node::UserCall(instructions::UserCommand::SET_PIXEL, vec![t.1])
 		}),
 		// set_pixel(i, r, g, b)
-		map(tuple((tag("set_pixel("), expression, tag(","), expression, tag(","), expression, tag(","), expression, tag(")"))), |t| {
-			Node::UserCall(instructions::UserCommand::SET_PIXEL, vec![
-				t.1,
-				t.3,
-				t.5,
-				t.7
-			])
-		})
+		map(
+			tuple((
+				tag("set_pixel("),
+				expression,
+				tag(","),
+				expression,
+				tag(","),
+				expression,
+				tag(","),
+				expression,
+				tag(")"),
+			)),
+			|t| {
+				Node::UserCall(
+					instructions::UserCommand::SET_PIXEL,
+					vec![t.1, t.3, t.5, t.7],
+				)
+			},
+		),
 	))(input)
 }
 
 fn user_expression(input: &str) -> IResult<&str, Expression> {
 	alt((
-		map(tag("get_length"), |_| Expression::User(instructions::UserCommand::GET_LENGTH)),
-		map(tag("get_wall_time"), |_| Expression::User(instructions::UserCommand::GET_WALL_TIME)),
-		map(tag("get_precise_time"), |_| Expression::User(instructions::UserCommand::GET_PRECISE_TIME))
+		map(tag("get_length"), |_| {
+			Expression::User(instructions::UserCommand::GET_LENGTH)
+		}),
+		map(tag("get_wall_time"), |_| {
+			Expression::User(instructions::UserCommand::GET_WALL_TIME)
+		}),
+		map(tag("get_precise_time"), |_| {
+			Expression::User(instructions::UserCommand::GET_PRECISE_TIME)
+		}),
 	))(input)
 }
 
 fn if_statement(input: &str) -> IResult<&str, Node> {
-	map(tuple((tag("if("), preceded(sp, terminated(expression, sp)), tag(")"), sp, tag("{"), program, tag("}"))), |t| {
-		if let Node::Statements(ss) = t.5 {
-			Node::If(t.1, ss)
-		}
-		else {
-			unreachable!()
-		}
-	})(input)
+	map(
+		tuple((
+			tag("if("),
+			preceded(sp, terminated(expression, sp)),
+			tag(")"),
+			sp,
+			tag("{"),
+			program,
+			tag("}"),
+		)),
+		|t| {
+			if let Node::Statements(ss) = t.5 {
+				Node::If(t.1, ss)
+			} else {
+				unreachable!()
+			}
+		},
+	)(input)
 }
 
-
 fn loop_statement(input: &str) -> IResult<&str, Node> {
-	map(tuple((tag("loop"), sp, tag("{"), sp, program, tag("}"))), |t| {
-		if let Node::Statements(ss) = t.4 {
-			Node::Loop(ss)
-		}
-		else {
-			unreachable!()
-		}
-	})(input)
+	map(
+		tuple((tag("loop"), sp, tag("{"), sp, program, tag("}"))),
+		|t| {
+			if let Node::Statements(ss) = t.4 {
+				Node::Loop(ss)
+			} else {
+				unreachable!()
+			}
+		},
+	)(input)
 }
 
 fn for_statement(input: &str) -> IResult<&str, Node> {
-	map(tuple((tag("for("), preceded(sp, terminated(variable_name, sp)), tag("="), preceded(sp, terminated(expression, sp)), tag(")"), sp, tag("{"), sp, program, sp, tag("}"))), |t| {
-		if let Node::Statements(ss) = t.8 {
-			Node::For(t.1.to_string(), t.3, ss)
-		}
-		else {
-			unreachable!()
-		}
-	})(input)
+	map(
+		tuple((
+			tag("for("),
+			preceded(sp, terminated(variable_name, sp)),
+			tag("="),
+			preceded(sp, terminated(expression, sp)),
+			tag(")"),
+			sp,
+			tag("{"),
+			sp,
+			program,
+			sp,
+			tag("}"),
+		)),
+		|t| {
+			if let Node::Statements(ss) = t.8 {
+				Node::For(t.1.to_string(), t.3, ss)
+			} else {
+				unreachable!()
+			}
+		},
+	)(input)
 }
 
 fn assigment_statement(input: &str) -> IResult<&str, Node> {
@@ -255,13 +287,25 @@ fn assigment_statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn statement(input: &str) -> IResult<&str, Node> {
-	alt((user_statement, special_statement, assigment_statement, if_statement, for_statement, loop_statement, expression_statement))(input)
+	alt((
+		user_statement,
+		special_statement,
+		assigment_statement,
+		if_statement,
+		for_statement,
+		loop_statement,
+		expression_statement,
+	))(input)
 }
 
 fn program(input: &str) -> IResult<&str, Node> {
-	terminated(map(separated_list(preceded(sp, tag(";")), preceded(sp, statement)), |statements| {
-		Node::Statements(statements)
-	}), sp)(input)
+	terminated(
+		map(
+			separated_list(preceded(sp, tag(";")), preceded(sp, statement)),
+			|statements| Node::Statements(statements),
+		),
+		sp,
+	)(input)
 }
 
 pub fn parse(source: &str) -> Result<Program, String> {
@@ -270,15 +314,14 @@ pub fn parse(source: &str) -> Result<Program, String> {
 			if remainder != "" {
 				let err_string = format!("Could not parse, remainder: {}", remainder);
 				Err(err_string)
-			}
-			else {
+			} else {
 				let mut p = Program::new();
 				let mut scope = Scope::new();
 				n.assemble(&mut p, &mut scope);
 				scope.assemble_teardown(&mut p);
 				Ok(p)
 			}
-		},
+		}
 		Err(x) => {
 			let err_string = format!("Parser error: {:?}", x);
 			Err(err_string)
@@ -294,8 +337,18 @@ mod tests {
 	fn main() {
 		assert_eq!(expression("0x0000CC"), Ok(("", Expression::Literal(204))));
 		assert_eq!(expression("1337"), Ok(("", Expression::Literal(1337))));
-		assert_eq!(expression("1+2"), Ok(("", Expression::Binary(Box::new(Expression::Literal(1)), instructions::Binary::ADD, Box::new(Expression::Literal(2))))));
-		
+		assert_eq!(
+			expression("1+2"),
+			Ok((
+				"",
+				Expression::Binary(
+					Box::new(Expression::Literal(1)),
+					instructions::Binary::ADD,
+					Box::new(Expression::Literal(2))
+				)
+			))
+		);
+
 		if let Ok((remainder, n)) = program("loop{if(1+2*3>4){yield};\ndump}") {
 			assert_eq!(remainder, "");
 			let mut program = Program::new();
