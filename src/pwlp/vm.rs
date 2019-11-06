@@ -22,10 +22,10 @@ impl Program {
 				match i {
 					Prefix::PUSHI => {
 						for _ in 0..postfix {
-							let value = self.code[pc + 1] as u32
-								| (self.code[pc + 2] as u32) << 8
-								| (self.code[pc + 3] as u32) << 16
-								| (self.code[pc + 4] as u32) << 24;
+							let value = u32::from(self.code[pc + 1])
+								| u32::from(self.code[pc + 2]) << 8
+								| u32::from(self.code[pc + 3]) << 16
+								| u32::from(self.code[pc + 4]) << 24;
 							stack.push(value);
 							print!("\tv={}", value);
 							pc += 4;
@@ -38,7 +38,7 @@ impl Program {
 							for _ in 0..postfix {
 								pc += 1;
 								print!("\tv={}", self.code[pc]);
-								stack.push(self.code[pc] as u32);
+								stack.push(u32::from(self.code[pc]));
 							}
 						}
 					}
@@ -54,7 +54,7 @@ impl Program {
 					}
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
 						let target =
-							((self.code[pc + 1] as u32) | (self.code[pc + 2] as u32) << 8) as usize;
+							(u32::from(self.code[pc + 1]) | (u32::from(self.code[pc + 2]) << 8)) as usize;
 
 						pc = match i {
 							Prefix::JMP => target,
@@ -76,7 +76,7 @@ impl Program {
 							}
 							_ => unreachable!(),
 						};
-						println!("");
+						println!();
 						continue;
 					}
 					Prefix::BINARY => {

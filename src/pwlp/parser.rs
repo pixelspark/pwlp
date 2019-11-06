@@ -166,7 +166,7 @@ fn expression(input: &str) -> IResult<&str, Expression> {
 }
 
 fn expression_statement(input: &str) -> IResult<&str, Node> {
-	map(expression, |e| Node::Expression(e))(input)
+	map(expression, Node::Expression)(input)
 }
 
 fn special_statement(input: &str) -> IResult<&str, Node> {
@@ -302,7 +302,7 @@ fn program(input: &str) -> IResult<&str, Node> {
 	terminated(
 		map(
 			separated_list(preceded(sp, tag(";")), preceded(sp, statement)),
-			|statements| Node::Statements(statements),
+			Node::Statements,
 		),
 		sp,
 	)(input)

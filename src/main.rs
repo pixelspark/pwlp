@@ -96,7 +96,7 @@ fn main() -> std::io::Result<()> {
 					println!("Program:\n{:?}", &prg);
 				}
 				if let Some(out_file) = matches.value_of("output") {
-					File::create(out_file)?.write(&prg.code)?;
+					File::create(out_file)?.write_all(&prg.code)?;
 				}
 			}
 			Err(s) => println!("Error: {}", s),
@@ -118,13 +118,13 @@ fn main() -> std::io::Result<()> {
 							.lte() // led_counter <= length
 							.if_zero(|r| {
 								r.peek(1)
-									.push(0xFF000000)
+									.push(0xFF_00_00_00)
 									.or() // led_value = 0xFF000000 | led_counter
 									.set_pixel() // set_pixel(led_value)
 									.pop(1);
 							})
 							.if_not_zero(|r| {
-								r.peek(1).push(0x00FF0000).or().set_pixel().pop(1);
+								r.peek(1).push(0x00_FF_00_00).or().set_pixel().pop(1);
 							})
 							.pop(1);
 					})
@@ -137,7 +137,7 @@ fn main() -> std::io::Result<()> {
 
 		// Start server
 		// Figure out bind address and open socket
-		let config_bind_address = config.bind_address.unwrap_or(String::from("0.0.0.0:33333"));
+		let config_bind_address = config.bind_address.unwrap_or_else(|| String::from("0.0.0.0:33333"));
 		let bind_address = matches.value_of("bind").unwrap_or(&config_bind_address);
 		let socket = UdpSocket::bind(bind_address).expect("could not bind to socket");
 
@@ -200,10 +200,9 @@ fn main() -> std::io::Result<()> {
 									Message::from_buffer(&pong.signed(secret), secret)
 										.expect("deserialize own message");
 
-									match socket.send_to(&pong.signed(secret), source_address) {
-										Err(t) => println!("Send pong failed: {:?}", t),
-										Ok(_) => {}
-									};
+									if let Err(t) = socket.send_to(&pong.signed(secret), source_address) {
+										println!("Send pong failed: {:?}", t);
+									}
 
 									let run = Message {
 										message_type: MessageType::Run,
@@ -212,10 +211,12 @@ fn main() -> std::io::Result<()> {
 										payload: Some(program.code.clone()),
 									};
 
-									match socket.send_to(&run.signed(secret), source_address) {
-										Err(t) => println!("Send pong failed: {:?}", t),
-										Ok(_) => {}
+									if let Err(t) = socket.send_to(&run.signed(secret), source_address) {
+										println!("Send pong failed: {:?}", t);
 									}
+								},
+								MessageType::Pong => {
+									// Ignore
 								}
 								_ => {}
 							}

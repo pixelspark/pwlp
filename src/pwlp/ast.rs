@@ -28,7 +28,7 @@ impl Scope {
 	}
 
 	pub(crate) fn assemble_teardown(&self, program: &mut Program) {
-		if self.variables.len() > 0 {
+		if self.variables.is_empty() {
 			program.pop(self.variables.len() as u8);
 		}
 	}
@@ -51,8 +51,7 @@ impl Node {
 			Node::UserCall(s, e) => {
 				match s {
 					instructions::UserCommand::SET_PIXEL => {
-						let mut n = 0;
-						for param in e.iter() {
+						for (n, param) in e.iter().enumerate() {
 							param.assemble(program, scope);
 							for _ in 0..n {
 								program.unary(instructions::Unary::SHL8);
@@ -61,7 +60,6 @@ impl Node {
 							if n > 0 {
 								program.or();
 							}
-							n += 1;
 						}
 					}
 					_ => {
@@ -87,7 +85,7 @@ impl Node {
 				});
 			}
 			Node::For(variable_name, expression, stmts) => {
-				if let Some(_) = scope.variables.iter().position(|r| r == variable_name) {
+				if scope.variables.iter().any(|r| r == variable_name) {
 					panic!("variable already defined")
 				}
 
@@ -120,7 +118,7 @@ impl Node {
 				scope.level -= 1;
 			}
 			Node::Assignment(variable_name, expression) => {
-				if let Some(_) = scope.variables.iter().position(|r| r == variable_name) {
+				if scope.variables.iter().any(|r| r == variable_name) {
 					panic!("variable already defined")
 				}
 				expression.assemble(program, scope);

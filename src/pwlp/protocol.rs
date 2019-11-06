@@ -67,8 +67,8 @@ impl Message {
 		}
 
 		match MacAddress::from_bytes(&buffer[0..6]) {
-			Ok(m) => return Ok(m),
-			Err(()) => return Err(MessageError::MacAddressInvalid),
+			Ok(m) => Ok(m),
+			Err(()) => Err(MessageError::MacAddressInvalid),
 		}
 	}
 
@@ -94,7 +94,7 @@ impl Message {
 		let payload_size = data_size - MAC_SIZE - TIME_SIZE;
 
 		Ok(Message {
-			mac_address: mac_address,
+			mac_address,
 			unix_time: u32::from_le_bytes(
 				buffer[MAC_SIZE..(MAC_SIZE + TIME_SIZE)].try_into().unwrap(),
 			),
@@ -130,6 +130,6 @@ impl Message {
 
 		let signature = hmac_sha1(key, &buf[0..data_size]);
 		buf.extend_from_slice(&signature);
-		return buf;
+		buf
 	}
 }

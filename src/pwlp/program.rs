@@ -12,7 +12,7 @@ pub struct Program {
 #[allow(dead_code)]
 impl Program {
 	fn write(&mut self, buffer: &[u8]) -> &mut Program {
-		self.code.write(buffer).unwrap();
+		self.code.write_all(buffer).unwrap();
 		self
 	}
 
@@ -25,12 +25,12 @@ impl Program {
 	}
 
 	pub fn nop(&mut self) -> &mut Program {
-		self.write(&[Prefix::POP as u8 | 0x00]) // POP 0
+		self.write(&[Prefix::POP as u8]) // POP 0
 	}
 
 	pub fn pop(&mut self, n: u8) -> &mut Program {
 		assert!(n <= 15, "cannot pop more than 15 stack items");
-		self.stack_size -= n as i32;
+		self.stack_size -= i32::from(n);
 		self.write(&[Prefix::POP as u8 | n]) // POP n
 	}
 
@@ -276,7 +276,7 @@ impl Program {
 	pub fn push(&mut self, b: u32) -> &mut Program {
 		self.stack_size += 1;
 		match b {
-			0 => self.code.write(&[Prefix::PUSHB as u8 | 0x00]).unwrap(),
+			0 => self.code.write(&[Prefix::PUSHB as u8]).unwrap(),
 			_ if b <= 0xFF => self
 				.code
 				.write(&[Prefix::PUSHB as u8 | 0x01, b as u8])
@@ -326,7 +326,7 @@ impl fmt::Debug for Program {
 						}
 					}
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
-						let target = (self.code[pc + 1] as u32) | (self.code[pc + 2] as u32) << 8;
+						let target = u32::from(self.code[pc + 1]) | u32::from(self.code[pc + 2]) << 8;
 						write!(f, "\tto {}", target)?;
 						pc += 2
 					}
@@ -359,11 +359,11 @@ impl fmt::Debug for Program {
 						write!(f, "\t{}", postfix)?;
 					}
 				}
-				write!(f, "\n")?;
+				writeln!(f)?;
 			} else {
-				write!(
+				writeln!(
 					f,
-					"{:04}.\t{:02x}\tUnknown instruction\n",
+					"{:04}.\t{:02x}\tUnknown instruction",
 					pc, self.code[pc]
 				)?;
 				break;
