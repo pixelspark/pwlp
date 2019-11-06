@@ -53,8 +53,8 @@ impl Program {
 						stack.push(val);
 					}
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
-						let target =
-							(u32::from(self.code[pc + 1]) | (u32::from(self.code[pc + 2]) << 8)) as usize;
+						let target = (u32::from(self.code[pc + 1])
+							| (u32::from(self.code[pc + 2]) << 8)) as usize;
 
 						pc = match i {
 							Prefix::JMP => target,

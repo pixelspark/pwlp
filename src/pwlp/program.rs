@@ -326,7 +326,8 @@ impl fmt::Debug for Program {
 						}
 					}
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
-						let target = u32::from(self.code[pc + 1]) | u32::from(self.code[pc + 2]) << 8;
+						let target =
+							u32::from(self.code[pc + 1]) | u32::from(self.code[pc + 2]) << 8;
 						write!(f, "\tto {}", target)?;
 						pc += 2
 					}
@@ -361,11 +362,7 @@ impl fmt::Debug for Program {
 				}
 				writeln!(f)?;
 			} else {
-				writeln!(
-					f,
-					"{:04}.\t{:02x}\tUnknown instruction",
-					pc, self.code[pc]
-				)?;
+				writeln!(f, "{:04}.\t{:02x}\tUnknown instruction", pc, self.code[pc])?;
 				break;
 			}
 

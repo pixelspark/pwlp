@@ -137,7 +137,9 @@ fn main() -> std::io::Result<()> {
 
 		// Start server
 		// Figure out bind address and open socket
-		let config_bind_address = config.bind_address.unwrap_or_else(|| String::from("0.0.0.0:33333"));
+		let config_bind_address = config
+			.bind_address
+			.unwrap_or_else(|| String::from("0.0.0.0:33333"));
 		let bind_address = matches.value_of("bind").unwrap_or(&config_bind_address);
 		let socket = UdpSocket::bind(bind_address).expect("could not bind to socket");
 
@@ -200,7 +202,9 @@ fn main() -> std::io::Result<()> {
 									Message::from_buffer(&pong.signed(secret), secret)
 										.expect("deserialize own message");
 
-									if let Err(t) = socket.send_to(&pong.signed(secret), source_address) {
+									if let Err(t) =
+										socket.send_to(&pong.signed(secret), source_address)
+									{
 										println!("Send pong failed: {:?}", t);
 									}
 
@@ -211,10 +215,12 @@ fn main() -> std::io::Result<()> {
 										payload: Some(program.code.clone()),
 									};
 
-									if let Err(t) = socket.send_to(&run.signed(secret), source_address) {
+									if let Err(t) =
+										socket.send_to(&run.signed(secret), source_address)
+									{
 										println!("Send pong failed: {:?}", t);
 									}
-								},
+								}
 								MessageType::Pong => {
 									// Ignore
 								}
