@@ -378,6 +378,16 @@ impl fmt::Debug for Program {
 						};
 						write!(f, "\t{}", name)?;
 					}
+					Prefix::SPECIAL => {
+						let name = match postfix {
+							12 => "swap",
+							13 => "dump",
+							14 => "yield",
+							15 => "two-byte instruction",
+							_ => "(unknown special function)",
+						};
+						write!(f, "\t{}", name)?;
+					}
 					_ => {
 						write!(f, "\t{}", postfix)?;
 					}
