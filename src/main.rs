@@ -2,7 +2,7 @@ mod pwlp;
 mod test;
 extern crate clap;
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, AppSettings, Arg, SubCommand};
 use eui48::MacAddress;
 use pwlp::parser::parse;
 use pwlp::program::Program;
@@ -32,14 +32,6 @@ fn main() -> std::io::Result<()> {
 		.version("1.0")
 		.about("Pixelspark wireless LED protocol server")
 		.author("Pixelspark")
-		.arg(
-			Arg::with_name("config")
-				.short("c")
-				.long("config")
-				.value_name("FILE")
-				.help("Config file to read")
-				.takes_value(true),
-		)
 		.subcommand(
 			SubCommand::with_name("compile")
 				.about("compiles a script to binary")
@@ -49,8 +41,12 @@ fn main() -> std::io::Result<()> {
 						.takes_value(true)
 						.help("the file to compile"),
 				)
-				.arg(Arg::with_name("output").index(2).takes_value(true))
-				.help("the file to write the binary output to"),
+				.arg(
+					Arg::with_name("output")
+						.index(2)
+						.takes_value(true)
+						.help("the file to write binary output to"),
+				),
 		)
 		.subcommand(
 			SubCommand::with_name("disassemble")
@@ -64,22 +60,43 @@ fn main() -> std::io::Result<()> {
 		)
 		.subcommand(SubCommand::with_name("run").about("run a script"))
 		.subcommand(
-			SubCommand::with_name("serve").about("start server").arg(
-				Arg::with_name("bind")
-					.short("b")
-					.long("bind")
-					.value_name("ADDRESS")
-					.help("Address the server should listen at")
-					.takes_value(true),
-			),
+			SubCommand::with_name("serve")
+				.about("start server")
+				.arg(
+					Arg::with_name("bind")
+						.short("b")
+						.long("bind")
+						.value_name("0.0.0.0:33333")
+						.help("Address the server should listen at (overrides default key set in config)")
+						.takes_value(true),
+				)
+				.arg(
+					Arg::with_name("secret")
+						.short("s")
+						.long("secret")
+						.value_name("secret")
+						.help("Default HMAC-SHA1 key to use for signing messages when no device-specific key is configured (overrides default key set in config)")
+						.takes_value(true)
+				)
+				.arg(
+					Arg::with_name("program")
+						.short("p")
+						.long("program")
+						.value_name("program.bin")
+						.help("Default program to serve when no device-specific program has been set (overrides default program file name set in config)")
+						.takes_value(true)
+				)
+				.arg(
+					Arg::with_name("config")
+						.short("c")
+						.long("config")
+						.value_name("config.toml")
+						.help("Config file to read")
+						.takes_value(true),
+				),
 		)
+		.setting(AppSettings::ArgRequiredElseHelp)
 		.get_matches();
-
-	// Read configuration file
-	let config_file = matches.value_of("config").unwrap_or("config.toml");
-	let mut config_string = String::new();
-	File::open(config_file)?.read_to_string(&mut config_string)?;
-	let config: Config = toml::from_str(&config_string)?;
 
 	// Find out which subcommand to perform
 	if let Some(_matches) = matches.subcommand_matches("run") {
@@ -125,6 +142,12 @@ fn main() -> std::io::Result<()> {
 		let program = Program::from_binary(source);
 		println!("{:?}", program);
 	} else if let Some(matches) = matches.subcommand_matches("serve") {
+		// Read configuration file
+		let config_file = matches.value_of("config").unwrap_or("config.toml");
+		let mut config_string = String::new();
+		File::open(config_file)?.read_to_string(&mut config_string)?;
+		let config: Config = toml::from_str(&config_string)?;
+
 		// Start server
 		// Figure out bind address and open socket
 		let config_bind_address = config
@@ -135,48 +158,58 @@ fn main() -> std::io::Result<()> {
 
 		let global_secret = config
 			.secret
-			.unwrap_or_else(|| String::from("secret"))
+			.unwrap_or_else(|| String::from(matches.value_of("bind").unwrap_or("secret")))
 			.as_bytes()
 			.to_owned();
 
-		let default_program = match config.program {
-			Some(path) => Program::from_file(&path).expect("error reading program file"),
+		let default_program = match matches.value_of("program") {
+			Some(path) => Program::from_file(&path).expect("error reading specified program file"),
 			None => {
-				// Use a hardcoded default program
-				let mut program = Program::new();
-				program
-					.push(0) // let counter = 0
-					.repeat_forever(|p| {
-						// while(true)
-						p.inc() // counter++
-							.get_length() // let length = get_length()
-							.r#mod() // counter % length
-							.get_length() // let led_counter = get_length()
-							.repeat(|q| {
-								// while(--led_counter)
-								q.dup()
-									.peek(2)
-									.lte() // led_counter <= length
-									.if_zero(|r| {
-										r.peek(1)
-											.push(0xFF_00_00_00)
-											.or() // led_value = 0xFF000000 | led_counter
-											.set_pixel() // set_pixel(led_value)
+				match config.program {
+					Some(path) => {
+						Program::from_file(&path).expect("program specified in config not found")
+					}
+					None => {
+						// Use a hardcoded default program
+						let mut program = Program::new();
+						program
+							.push(0) // let counter = 0
+							.repeat_forever(|p| {
+								// while(true)
+								p.inc() // counter++
+									.get_length() // let length = get_length()
+									.r#mod() // counter % length
+									.get_length() // let led_counter = get_length()
+									.repeat(|q| {
+										// while(--led_counter)
+										q.dup()
+											.peek(2)
+											.lte() // led_counter <= length
+											.if_zero(|r| {
+												r.peek(1)
+													.push(0xFF_00_00_00)
+													.or() // led_value = 0xFF000000 | led_counter
+													.set_pixel() // set_pixel(led_value)
+													.pop(1);
+											})
+											.if_not_zero(|r| {
+												r.peek(1)
+													.push(0x00_FF_00_00)
+													.or()
+													.set_pixel()
+													.pop(1);
+											})
 											.pop(1);
 									})
-									.if_not_zero(|r| {
-										r.peek(1).push(0x00_FF_00_00).or().set_pixel().pop(1);
-									})
-									.pop(1);
-							})
-							.blit()
-							.pop(1)
-							.r#yield();
-					});
-				program
+									.blit()
+									.pop(1)
+									.r#yield();
+							});
+						program
+					}
+				}
 			}
 		};
-		println!("Default program:\n{:?}", default_program);
 		println!("PWLP server listening at {}", bind_address);
 
 		loop {
