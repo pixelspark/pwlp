@@ -18,6 +18,14 @@ impl Program {
 		self
 	}
 
+	pub fn from_binary(data: Vec<u8>) -> Program {
+		Program {
+			code: data,
+			stack_size: 0,
+			offset: 0
+		}
+	}
+
 	pub fn from_file(path: &str) -> std::io::Result<Program> {
 		let mut stored_bin = Vec::<u8>::new();
 		File::open(path)?.read_to_end(&mut stored_bin)?;

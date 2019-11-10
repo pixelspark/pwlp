@@ -52,6 +52,16 @@ fn main() -> std::io::Result<()> {
 				.arg(Arg::with_name("output").index(2).takes_value(true))
 				.help("the file to write the binary output to"),
 		)
+		.subcommand(
+			SubCommand::with_name("disassemble")
+				.about("disassemble binary file to instructions")
+				.arg(
+					Arg::with_name("file")
+						.index(1)
+						.takes_value(true)
+						.help("the file to disassemble"),
+				)
+		)
 		.subcommand(SubCommand::with_name("run").about("run a script"))
 		.subcommand(
 			SubCommand::with_name("serve").about("start server").arg(
@@ -104,7 +114,19 @@ fn main() -> std::io::Result<()> {
 			}
 			Err(s) => println!("Error: {}", s),
 		};
-	} else if let Some(matches) = matches.subcommand_matches("serve") {
+	} 
+	else if let Some(matches) = matches.subcommand_matches("disassemble") {
+		let mut source = Vec::<u8>::new();
+		if let Some(source_file) = matches.value_of("file") {
+			File::open(source_file)?.read_to_end(&mut source)?;
+		} else {
+			stdin().read_to_end(&mut source)?;
+		}
+
+		let program = Program::from_binary(source);
+		println!("{:?}", program);
+	}
+	else if let Some(matches) = matches.subcommand_matches("serve") {
 		// Start server
 		// Figure out bind address and open socket
 		let config_bind_address = config
