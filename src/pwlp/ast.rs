@@ -108,6 +108,7 @@ impl Node {
 				program.pop(1);
 			}
 			Node::If(e, ss) => {
+				let old_level = scope.level;
 				e.assemble(program, scope);
 				program.if_not_zero(|q| {
 					for i in ss.iter() {
@@ -115,7 +116,7 @@ impl Node {
 					}
 				});
 				program.pop(1);
-				scope.level -= 1;
+				scope.level = old_level;
 			}
 			Node::Assignment(variable_name, expression) => {
 				if scope.variables.iter().any(|r| r == variable_name) {

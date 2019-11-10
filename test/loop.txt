@@ -1,11 +1,13 @@
-for(i = get_length ) {
-	for(j = get_length) {
-		if(i == j) {
-			set_pixel(j, 255, 255, 255);
+loop {
+	for(i = get_length) {
+		for(j = get_length) {
+			if(i == j) {
+				set_pixel(j, 255, 255, 255);
+			};
+			if(i != j) {
+				set_pixel(j, 255, 0, 0);
+			};
 		};
-		if( i!= j) {
-			set_pixel(j, 255, 255, 255)
-		}
-	};
-	blit
+		blit
+	}
 }
