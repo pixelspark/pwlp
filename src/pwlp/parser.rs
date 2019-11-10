@@ -256,12 +256,33 @@ fn if_statement(input: &str) -> IResult<&str, Node> {
 			tag(")"),
 			sp,
 			tag("{"),
+			sp,
 			program,
+			sp,
 			tag("}"),
+			sp,
+			opt(tuple((
+				tag("else {"),
+				sp,
+				program,
+				sp,
+				tag("}"),
+				sp
+			)))
 		)),
 		|t| {
-			if let Node::Statements(ss) = t.5 {
-				Node::If(t.1, ss)
+			if let Node::Statements(if_statements) = t.6 {
+				if let Some(else_tuple) = t.10 {
+					if let Node::Statements(else_statements) = else_tuple.2 {
+						Node::IfElse(t.1, if_statements, else_statements)
+					}
+					else {
+						unreachable!()
+					}
+				}
+				else {
+					Node::If(t.1, if_statements)
+				}
 			} else {
 				unreachable!()
 			}

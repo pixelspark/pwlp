@@ -10,6 +10,7 @@ pub enum Node {
 	Statements(Vec<Node>),
 	Loop(Vec<Node>),
 	If(Expression, Vec<Node>),
+	IfElse(Expression, Vec<Node>, Vec<Node>),
 	Assignment(String, Expression),
 	For(String, Expression, Vec<Node>),
 }
@@ -121,6 +122,22 @@ impl Node {
 				e.assemble(program, scope);
 				program.if_not_zero(|q| {
 					for i in ss.iter() {
+						i.assemble(q, scope);
+					}
+				});
+				program.pop(1);
+				scope.level = old_level;
+			}
+			Node::IfElse(e, if_statements, else_statements) => {
+				let old_level = scope.level;
+				e.assemble(program, scope);
+				program.if_not_zero(|q| {
+					for i in if_statements.iter() {
+						i.assemble(q, scope);
+					}
+				});
+				program.if_zero(|q| {
+					for i in else_statements.iter() {
 						i.assemble(q, scope);
 					}
 				});

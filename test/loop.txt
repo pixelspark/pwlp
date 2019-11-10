@@ -3,8 +3,8 @@ loop {
 		for(j = get_length) {
 			if(i == j) {
 				set_pixel(j, 255, 255, 255);
-			};
-			if(i != j) {
+			}
+			else {
 				set_pixel(j, 255, 0, 0);
 			};
 		};
