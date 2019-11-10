@@ -122,6 +122,8 @@ pub enum Binary {
 	GTE = 9,
 	LT = 10,
 	LTE = 11,
+	EQ = 12,
+	NEQ = 13
 }
 
 impl Binary {
@@ -139,6 +141,8 @@ impl Binary {
 			9 => Some(Binary::GTE),
 			10 => Some(Binary::LT),
 			11 => Some(Binary::LTE),
+			12 => Some(Binary::EQ),
+			13 => Some(Binary::NEQ),
 			_ => None,
 		}
 	}
@@ -151,17 +155,19 @@ impl std::fmt::Display for Binary {
 			"{}",
 			match self {
 				Binary::ADD => "ADD",
-				Binary::SUB => "SUB",
-				Binary::DIV => "DIV",
-				Binary::MUL => "MUL",
-				Binary::MOD => "MOD",
 				Binary::AND => "AND",
-				Binary::OR => "OR",
-				Binary::XOR => "XOR",
+				Binary::DIV => "DIV",
+				Binary::EQ => "EQ",
 				Binary::GT => "GT",
 				Binary::GTE => "GTE",
 				Binary::LT => "LT",
 				Binary::LTE => "LTE",
+				Binary::MOD => "MOD",
+				Binary::MUL => "MUL",
+				Binary::NEQ => "NEQ",
+				Binary::OR => "OR",
+				Binary::SUB => "SUB",
+				Binary::XOR => "XOR",
 			}
 		)
 	}

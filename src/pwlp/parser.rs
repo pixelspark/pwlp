@@ -1,7 +1,7 @@
 use nom::{
 	branch::alt,
 	bytes::complete::{tag, take_while, take_while1},
-	combinator::{map, map_res},
+	combinator::{map, map_res, opt},
 	multi::{fold_many0, separated_list},
 	sequence::{pair, preceded, terminated, tuple},
 	IResult,
@@ -67,13 +67,15 @@ fn comparison(input: &str) -> IResult<&str, Expression> {
 	let (input, init) = unaries(input)?;
 
 	fold_many0(
-		pair(alt((tag(">="), tag("<="), tag(">"), tag("<"))), unaries),
+		pair(preceded(sp, terminated(alt((tag(">="), tag("<="), tag(">"), tag("<"), tag("=="), tag("!="))), sp)), unaries),
 		init,
 		|acc, (op, val): (&str, Expression)| match op {
 			">=" => Expression::Binary(Box::new(acc), instructions::Binary::GTE, Box::new(val)),
 			"<=" => Expression::Binary(Box::new(acc), instructions::Binary::LTE, Box::new(val)),
 			">" => Expression::Binary(Box::new(acc), instructions::Binary::GT, Box::new(val)),
 			"<" => Expression::Binary(Box::new(acc), instructions::Binary::LT, Box::new(val)),
+			"==" => Expression::Binary(Box::new(acc), instructions::Binary::EQ, Box::new(val)),
+			"!=" => Expression::Binary(Box::new(acc), instructions::Binary::NEQ, Box::new(val)),
 			_ => unreachable!(),
 		},
 	)(input)
@@ -188,13 +190,13 @@ fn user_statement(input: &str) -> IResult<&str, Node> {
 		map(
 			tuple((
 				tag("set_pixel("),
-				expression,
+				preceded(sp, terminated(expression, sp)),
 				tag(","),
-				expression,
+				preceded(sp, terminated(expression, sp)),
 				tag(","),
-				expression,
+				preceded(sp, terminated(expression, sp)),
 				tag(","),
-				expression,
+				preceded(sp, terminated(expression, sp)),
 				tag(")"),
 			)),
 			|t| {
@@ -299,13 +301,13 @@ fn statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn program(input: &str) -> IResult<&str, Node> {
-	terminated(
+	terminated(terminated(terminated(
 		map(
 			separated_list(preceded(sp, tag(";")), preceded(sp, statement)),
 			Node::Statements,
 		),
-		sp,
-	)(input)
+		sp
+	), opt(tag(";"))), sp)(input)
 }
 
 pub fn parse(source: &str) -> Result<Program, String> {

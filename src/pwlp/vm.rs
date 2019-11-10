@@ -92,6 +92,20 @@ impl Program {
 								Binary::AND => lhs & rhs,
 								Binary::OR => lhs | rhs,
 								Binary::XOR => lhs ^ rhs,
+								Binary::EQ => {
+									if lhs == rhs {
+										1
+									} else {
+										0
+									}
+								},
+								Binary::NEQ => {
+									if lhs != rhs {
+										1
+									} else {
+										0
+									}
+								},
 								Binary::GT => {
 									if lhs > rhs {
 										1
