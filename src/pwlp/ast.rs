@@ -152,6 +152,13 @@ pub enum Expression {
 
 impl Expression {
 	fn assemble(&self, program: &mut Program, scope: &mut Scope) {
+		// If we can be simplified to a constant expression, do that!
+		if let Some(c) = self.const_value() {
+			program.push(c);
+			scope.level += 1;
+			return;
+		}
+
 		match self {
 			Expression::Literal(u) => {
 				program.push(*u);
@@ -186,6 +193,51 @@ impl Expression {
 					scope.level += 1;
 				} else {
 					panic!("variable not found")
+				}
+			}
+		}
+	}
+
+	fn const_value(&self) -> Option<u32> {
+		match &self {
+			Expression::Literal(u) => Some(*u),
+			Expression::UserCall(_, _) | Expression::User(_) => None,
+			Expression::Load(_var_name) => None,
+			Expression::Binary(lhs, op, rhs) => {
+				if let (Some(lhc), Some(rhc)) = (lhs.const_value(), rhs.const_value()) {
+					match op {
+						instructions::Binary::ADD => Some(lhc.overflowing_add(rhc).0),
+						instructions::Binary::SUB => Some(lhc.overflowing_sub(rhc).0),
+						instructions::Binary::DIV => Some(lhc.overflowing_div(rhc).0),
+						instructions::Binary::MUL => Some(lhc.overflowing_mul(rhc).0),
+						instructions::Binary::MOD => Some(lhc % rhc),
+						instructions::Binary::EQ => Some(if lhc == rhc { 1 } else { 0 }),
+						instructions::Binary::NEQ => Some(if lhc != rhc { 1 } else { 0 }),
+						instructions::Binary::LT => Some(if lhc < rhc { 1 } else { 0 }),
+						instructions::Binary::LTE => Some(if lhc <= rhc { 1 } else { 0 }),
+						instructions::Binary::GT => Some(if lhc > rhc { 1 } else { 0 }),
+						instructions::Binary::GTE => Some(if lhc >= rhc { 1 } else { 0 }),
+						instructions::Binary::OR => Some(lhc | rhc),
+						instructions::Binary::XOR => Some(lhc ^ rhc),
+						instructions::Binary::AND => Some(lhc & rhc)
+					}
+				} else {
+					None
+				}
+			}
+
+			Expression::Unary(op, rhs) => {
+				if let Some(c) = rhs.const_value() {
+					match op {
+						instructions::Unary::INC => Some(c.overflowing_add(1).0),
+						instructions::Unary::DEC => Some(c.overflowing_sub(1).0),
+						instructions::Unary::NOT => Some(!c),
+						instructions::Unary::NEG => None,  // TODO
+						instructions::Unary::SHL8 => None, // TODO
+						instructions::Unary::SHR8 => None, // TODO
+					}
+				} else {
+					None
 				}
 			}
 		}

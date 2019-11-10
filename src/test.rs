@@ -8,7 +8,7 @@ use std::fs::File;
 use super::pwlp::parse;
 
 #[cfg(test)]
-use std::io::{Read};
+use std::io::Read;
 
 #[test]
 fn compare_output_of_compiler_to_stored_binaries() {
@@ -19,14 +19,20 @@ fn compare_output_of_compiler_to_stored_binaries() {
 		if let Some(os_ext) = name.path().extension() {
 			if os_ext.to_str() == Some("txt") {
 				let mut source = String::new();
-				File::open(name.path()).unwrap().read_to_string(&mut source).unwrap();
+				File::open(name.path())
+					.unwrap()
+					.read_to_string(&mut source)
+					.unwrap();
 
 				match parse(&source) {
 					Ok(prg) => {
 						// Compare with stored binary
 						let bin_path = name.path().with_extension("bin");
 						let mut stored_bin = Vec::<u8>::new();
-						File::open(bin_path).unwrap().read_to_end(&mut stored_bin).unwrap();
+						File::open(bin_path)
+							.unwrap()
+							.read_to_end(&mut stored_bin)
+							.unwrap();
 
 						if stored_bin.len() != prg.code.len() {
 							panic!("Binary size is different for {}: {} compiled, {} stored\nCompiled: {:?}\nStored: {:?}", 
@@ -45,14 +51,18 @@ fn compare_output_of_compiler_to_stored_binaries() {
 								stored_bin)
 							}
 						}
+
+						// Verify disassembly is equal
+						let dis_path = name.path().with_extension("dis");
+						let mut stored_dis = String::new();
+						File::open(dis_path).unwrap().read_to_string(&mut stored_dis).unwrap();
+						let my_dis = format!("{:?}\n", prg);
+						assert_eq!(my_dis, stored_dis);
 					}
-					Err(s) => {
-						panic!("Parse error in {}: {}", name.path().display(), s)
-					}
+					Err(s) => panic!("Parse error in {}: {}", name.path().display(), s),
 				};
 			}
-		}
-		else {
+		} else {
 			println!("Not reading: {}", name.path().display())
 		}
 	}

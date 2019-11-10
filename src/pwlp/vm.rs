@@ -100,14 +100,14 @@ impl Program {
 									} else {
 										0
 									}
-								},
+								}
 								Binary::NEQ => {
 									if lhs != rhs {
 										1
 									} else {
 										0
 									}
-								},
+								}
 								Binary::GT => {
 									if lhs > rhs {
 										1

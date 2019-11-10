@@ -1,6 +1,6 @@
 use std::fmt;
-use std::io::{Write, Read};
 use std::fs::File;
+use std::io::{Read, Write};
 
 use super::instructions::{Binary, Prefix, Special, Unary, UserCommand};
 
@@ -22,7 +22,7 @@ impl Program {
 		Program {
 			code: data,
 			stack_size: 0,
-			offset: 0
+			offset: 0,
 		}
 	}
 
@@ -30,9 +30,9 @@ impl Program {
 		let mut stored_bin = Vec::<u8>::new();
 		File::open(path)?.read_to_end(&mut stored_bin)?;
 		Ok(Program {
-			code : stored_bin,
+			code: stored_bin,
 			stack_size: 0,
-			offset: 0
+			offset: 0,
 		})
 	}
 

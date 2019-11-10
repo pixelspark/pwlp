@@ -123,7 +123,7 @@ pub enum Binary {
 	LT = 10,
 	LTE = 11,
 	EQ = 12,
-	NEQ = 13
+	NEQ = 13,
 }
 
 impl Binary {
@@ -181,5 +181,5 @@ pub enum UserCommand {
 	GET_PRECISE_TIME = 2,
 	SET_PIXEL = 3,
 	BLIT = 4,
-	RANDOM_INT = 5
+	RANDOM_INT = 5,
 }

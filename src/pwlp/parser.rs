@@ -67,7 +67,23 @@ fn comparison(input: &str) -> IResult<&str, Expression> {
 	let (input, init) = unaries(input)?;
 
 	fold_many0(
-		pair(preceded(sp, terminated(alt((tag(">="), tag("<="), tag(">"), tag("<"), tag("=="), tag("!="))), sp)), unaries),
+		pair(
+			preceded(
+				sp,
+				terminated(
+					alt((
+						tag(">="),
+						tag("<="),
+						tag(">"),
+						tag("<"),
+						tag("=="),
+						tag("!="),
+					)),
+					sp,
+				),
+			),
+			unaries,
+		),
 		init,
 		|acc, (op, val): (&str, Expression)| match op {
 			">=" => Expression::Binary(Box::new(acc), instructions::Binary::GTE, Box::new(val)),
@@ -286,9 +302,14 @@ fn for_statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn assigment_statement(input: &str) -> IResult<&str, Node> {
-	map(tuple((variable_name, preceded(sp, terminated(tag("="), sp)), expression)), |t| {
-		Node::Assignment(t.0.to_string(), t.2)
-	})(input)
+	map(
+		tuple((
+			variable_name,
+			preceded(sp, terminated(tag("="), sp)),
+			expression,
+		)),
+		|t| Node::Assignment(t.0.to_string(), t.2),
+	)(input)
 }
 
 fn statement(input: &str) -> IResult<&str, Node> {
@@ -304,13 +325,19 @@ fn statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn program(input: &str) -> IResult<&str, Node> {
-	terminated(terminated(terminated(
-		map(
-			separated_list(preceded(sp, tag(";")), preceded(sp, statement)),
-			Node::Statements,
+	terminated(
+		terminated(
+			terminated(
+				map(
+					separated_list(preceded(sp, tag(";")), preceded(sp, statement)),
+					Node::Statements,
+				),
+				sp,
+			),
+			opt(tag(";")),
 		),
-		sp
-	), opt(tag(";"))), sp)(input)
+		sp,
+	)(input)
 }
 
 pub fn parse(source: &str) -> Result<Program, String> {

@@ -1,6 +1,4 @@
-0000.	11	PUSHB	[ff]
-0002.	31	PUSHI	[00, cc, 00, 00]
-0007.	86	BINARY	OR
-0008.	e3	USER	set_pixel
-0009.	01	POP	1
+0000.	31	PUSHI	[ff, cc, 00, 00]
+0005.	e3	USER	set_pixel
+0006.	01	POP	1
 

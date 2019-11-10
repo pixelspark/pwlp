@@ -60,7 +60,7 @@ fn main() -> std::io::Result<()> {
 						.index(1)
 						.takes_value(true)
 						.help("the file to disassemble"),
-				)
+				),
 		)
 		.subcommand(SubCommand::with_name("run").about("run a script"))
 		.subcommand(
@@ -114,8 +114,7 @@ fn main() -> std::io::Result<()> {
 			}
 			Err(s) => println!("Error: {}", s),
 		};
-	} 
-	else if let Some(matches) = matches.subcommand_matches("disassemble") {
+	} else if let Some(matches) = matches.subcommand_matches("disassemble") {
 		let mut source = Vec::<u8>::new();
 		if let Some(source_file) = matches.value_of("file") {
 			File::open(source_file)?.read_to_end(&mut source)?;
@@ -125,8 +124,7 @@ fn main() -> std::io::Result<()> {
 
 		let program = Program::from_binary(source);
 		println!("{:?}", program);
-	}
-	else if let Some(matches) = matches.subcommand_matches("serve") {
+	} else if let Some(matches) = matches.subcommand_matches("serve") {
 		// Start server
 		// Figure out bind address and open socket
 		let config_bind_address = config
@@ -135,8 +133,12 @@ fn main() -> std::io::Result<()> {
 		let bind_address = matches.value_of("bind").unwrap_or(&config_bind_address);
 		let socket = UdpSocket::bind(bind_address).expect("could not bind to socket");
 
-		let global_secret = config.secret.unwrap_or(String::from("secret")).as_bytes().to_owned();
-		
+		let global_secret = config
+			.secret
+			.unwrap_or(String::from("secret"))
+			.as_bytes()
+			.to_owned();
+
 		let default_program = match config.program {
 			Some(path) => Program::from_file(&path).expect("error reading program file"),
 			None => {
@@ -235,13 +237,12 @@ fn main() -> std::io::Result<()> {
 
 									let device_program = if let Some(config) = &device_config {
 										if let Some(path) = &config.program {
-											Program::from_file(&path).expect("error loading device-specific program")
-										}
-										else {
+											Program::from_file(&path)
+												.expect("error loading device-specific program")
+										} else {
 											default_program.clone()
 										}
-									}
-									else {
+									} else {
 										default_program.clone()
 									};
 
