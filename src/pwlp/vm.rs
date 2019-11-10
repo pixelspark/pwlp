@@ -1,8 +1,10 @@
 use super::instructions::{Binary, Prefix, Unary};
 use super::program::Program;
+use rand::Rng;
 
 impl Program {
 	pub fn run(&self) {
+		let mut rng = rand::thread_rng();
 		let mut pc = 0;
 		let mut stack: Vec<u32> = vec![];
 
@@ -169,6 +171,10 @@ impl Program {
 							print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
 						}
 						4 => print!("\tblit"),
+						5 => {
+							let v = stack.pop().unwrap();
+							stack.push(rng.gen_range(0, v));
+						}
 						_ => {
 							print!("\t(unknown user function)");
 							break;

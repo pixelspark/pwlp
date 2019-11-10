@@ -14,6 +14,7 @@ pub enum Node {
 	For(String, Expression, Vec<Node>),
 }
 
+#[derive(Clone, Debug)]
 pub struct Scope {
 	variables: Vec<String>,
 	level: u32,
@@ -28,7 +29,7 @@ impl Scope {
 	}
 
 	pub(crate) fn assemble_teardown(&self, program: &mut Program) {
-		if self.variables.is_empty() {
+		if !self.variables.is_empty() {
 			program.pop(self.variables.len() as u8);
 		}
 	}
@@ -70,7 +71,7 @@ impl Node {
 				}
 				program.user(*s);
 				program.pop(1);
-				scope.level -= 1;
+				scope.level -= (e.len()) as u32;
 			}
 			Node::Statements(stmts) => {
 				for i in stmts.iter() {
@@ -79,8 +80,13 @@ impl Node {
 			}
 			Node::Loop(stmts) => {
 				program.repeat_forever(move |q| {
+					let mut child_scope = scope.clone();
 					for i in stmts.iter() {
-						i.assemble(q, scope);
+						i.assemble(q, &mut child_scope);
+					}
+					assert_eq!(child_scope.level, scope.level);
+					if child_scope.variables.len() > scope.variables.len() {
+						q.pop((child_scope.variables.len() - scope.variables.len()) as u8);
 					}
 				});
 			}
@@ -93,9 +99,12 @@ impl Node {
 				scope.variables.push(variable_name.clone());
 				scope.level -= 1;
 				program.repeat(|q| {
+					let mut child_scope = scope.clone();
 					for i in stmts.iter() {
-						i.assemble(q, scope);
+						i.assemble(q, &mut child_scope);
 					}
+
+					assert_eq!(child_scope.level, scope.level);
 				});
 
 				// Undefine variable
@@ -104,7 +113,7 @@ impl Node {
 				} else {
 					panic!("variable already defined")
 				}
-				scope.level += 1;
+				//scope.level += 1;
 				program.pop(1);
 			}
 			Node::If(e, ss) => {
@@ -137,6 +146,7 @@ pub enum Expression {
 	Unary(instructions::Unary, Box<Expression>),
 	Binary(Box<Expression>, instructions::Binary, Box<Expression>),
 	User(instructions::UserCommand),
+	UserCall(instructions::UserCommand, Vec<Expression>),
 	Load(String),
 }
 
@@ -150,6 +160,14 @@ impl Expression {
 			Expression::User(s) => {
 				program.user(*s);
 				scope.level += 1;
+			}
+			Expression::UserCall(s, e) => {
+				let old_level = scope.level;
+				for param in e.iter() {
+					param.assemble(program, scope);
+				}
+				program.user(*s);
+				scope.level = old_level + 1;
 			}
 			Expression::Unary(op, rhs) => {
 				rhs.assemble(program, scope);

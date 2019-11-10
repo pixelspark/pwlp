@@ -211,6 +211,9 @@ fn user_statement(input: &str) -> IResult<&str, Node> {
 
 fn user_expression(input: &str) -> IResult<&str, Expression> {
 	alt((
+		map(tuple((tag("random("), expression, tag(")"))), |t| {
+			Expression::UserCall(instructions::UserCommand::RANDOM_INT, vec![t.1])
+		}),
 		map(tag("get_length"), |_| {
 			Expression::User(instructions::UserCommand::GET_LENGTH)
 		}),
@@ -283,7 +286,7 @@ fn for_statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn assigment_statement(input: &str) -> IResult<&str, Node> {
-	map(tuple((variable_name, tag("="), expression)), |t| {
+	map(tuple((variable_name, preceded(sp, terminated(tag("="), sp)), expression)), |t| {
 		Node::Assignment(t.0.to_string(), t.2)
 	})(input)
 }

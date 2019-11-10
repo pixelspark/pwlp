@@ -181,4 +181,5 @@ pub enum UserCommand {
 	GET_PRECISE_TIME = 2,
 	SET_PIXEL = 3,
 	BLIT = 4,
+	RANDOM_INT = 5
 }

@@ -1,0 +1,15 @@
+
+loop {
+	lucky = random(get_length);
+	for(n=get_length) {
+		set_pixel(n, 0, 0, 0);
+		if(n == lucky) {
+			set_pixel(n, 255, 255, 255);
+		}
+	};
+	blit;
+	for(n=get_length) {
+		set_pixel(n, 0, 0, 0);
+	};
+	blit;
+}

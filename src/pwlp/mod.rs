@@ -1,5 +1,6 @@
 extern crate hmacsha1;
 extern crate nom;
+extern crate rand;
 
 pub mod instructions;
 
