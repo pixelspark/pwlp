@@ -35,7 +35,7 @@ fn compare_output_of_compiler_to_stored_binaries() {
 							.unwrap();
 
 						if stored_bin.len() != prg.code.len() {
-							panic!("Binary size is different for {}: {} compiled, {} stored\nCompiled: {:?}\nStored: {:?}", 
+							panic!("[{}] Binary size is different: {} compiled, {} stored\nCompiled: {:?}\nStored: {:?}", 
 								name.path().display(),
 								prg.code.len(),
 								stored_bin.len(),
@@ -45,7 +45,8 @@ fn compare_output_of_compiler_to_stored_binaries() {
 
 						for idx in 0..stored_bin.len() {
 							if stored_bin[idx] != prg.code[idx] {
-								panic!("Binary is different at index {}:\nCompiled: {:?}\nStored: {:?}", 
+								panic!("[{}] Binary is different at index {}:\nCompiled: {:?}\nStored: {:?}", 
+								name.path().display(),
 								idx,
 								prg.code,
 								stored_bin)
@@ -62,7 +63,7 @@ fn compare_output_of_compiler_to_stored_binaries() {
 						let my_dis = format!("{:?}\n", prg);
 						assert_eq!(my_dis, stored_dis);
 					}
-					Err(s) => panic!("Parse error in {}: {}", name.path().display(), s),
+					Err(s) => panic!("[{}] Parse error: {}", name.path().display(), s),
 				};
 			}
 		} else {

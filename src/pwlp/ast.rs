@@ -15,17 +15,73 @@ pub enum Node {
 	For(String, Expression, Vec<Node>),
 }
 
-#[derive(Clone, Debug)]
-pub struct Scope {
+#[derive(Debug)]
+pub struct Scope<'a> {
 	variables: Vec<String>,
 	level: u32,
+	parent: Option<&'a Scope<'a>>
 }
 
-impl Scope {
-	pub fn new() -> Scope {
+impl<'a> Scope<'a> {
+	pub fn new() -> Scope<'a> {
 		Scope {
 			variables: vec![],
 			level: 0,
+			parent: None
+		}
+	}
+
+	pub fn nest(&'a self) -> Scope<'a> {
+		Scope {
+			parent: Some(&self),
+			level: 0,
+			variables: vec![]
+		}
+	}
+
+	pub fn unnest(&mut self, program: &mut Program) {
+		match self.parent {
+			Some(_) => {
+				self.assemble_teardown(program);
+				self.parent = None
+			},
+			None => panic!("cannot unnest scope without parent")
+		}
+	}
+
+	pub fn index_of(&self, variable_name: &String) -> Option<u32> {
+		if let Some(i) = self.variables.iter().position(|r| r == variable_name) {
+			Some(self.level - 1 - (i as u32))
+		}
+		else {
+			if let Some(p) = self.parent {
+				match p.index_of(variable_name) {
+					Some(p_index) => {
+						Some(p_index + self.level)
+					},
+					None => None
+				}
+			}
+			else {
+				None
+			}
+		}
+	}
+
+	pub fn define_variable(&mut self, variable_name: &String) {
+		if self.variables.iter().any(|r| r == variable_name) {
+			panic!("variable already defined")
+		}
+
+		self.variables.push(variable_name.clone());
+		// A variable was already pushed, but we are now counting it througn variables.len()
+	}
+
+	pub fn undefine_variable(&mut self, variable_name: &String) {
+		if let Some(p) = self.variables.iter().position(|r| r == variable_name) {
+			self.variables.remove(p);
+		} else {
+			panic!("variable was not defined")
 		}
 	}
 
@@ -80,41 +136,28 @@ impl Node {
 				}
 			}
 			Node::Loop(stmts) => {
-				program.repeat_forever(move |q| {
-					let mut child_scope = scope.clone();
+				program.repeat_forever(|q| {
+					let mut child_scope = scope.nest();
 					for i in stmts.iter() {
 						i.assemble(q, &mut child_scope);
 					}
-					assert_eq!(child_scope.level, scope.level);
-					if child_scope.variables.len() > scope.variables.len() {
-						q.pop((child_scope.variables.len() - scope.variables.len()) as u8);
-					}
+					child_scope.unnest(q);
 				});
 			}
 			Node::For(variable_name, expression, stmts) => {
-				if scope.variables.iter().any(|r| r == variable_name) {
-					panic!("variable already defined")
-				}
-
 				expression.assemble(program, scope);
-				scope.variables.push(variable_name.clone());
-				scope.level -= 1;
+				scope.define_variable(variable_name);
 				program.repeat(|q| {
-					let mut child_scope = scope.clone();
+					let mut child_scope = scope.nest();
 					for i in stmts.iter() {
 						i.assemble(q, &mut child_scope);
 					}
-
-					assert_eq!(child_scope.level, scope.level);
+					child_scope.unnest(q);
 				});
 
 				// Undefine variable
-				if let Some(p) = scope.variables.iter().position(|r| r == variable_name) {
-					scope.variables.remove(p);
-				} else {
-					panic!("variable already defined")
-				}
-				//scope.level += 1;
+				scope.undefine_variable(variable_name);
+				scope.level -= 1;
 				program.pop(1);
 			}
 			Node::If(e, ss) => {
@@ -128,7 +171,7 @@ impl Node {
 				program.pop(1);
 				scope.level = old_level;
 			}
-			Node::IfElse(e, if_statements, else_statements) => {
+			Node::IfElse(e, if_statements, else_statements) => {	
 				let old_level = scope.level;
 				e.assemble(program, scope);
 				program.if_not_zero(|q| {
@@ -145,13 +188,8 @@ impl Node {
 				scope.level = old_level;
 			}
 			Node::Assignment(variable_name, expression) => {
-				if scope.variables.iter().any(|r| r == variable_name) {
-					panic!("variable already defined")
-				}
 				expression.assemble(program, scope);
-				scope.variables.push(variable_name.clone());
-				scope.level -= 1;
-				// Left on the stack but cleaned up later by Scope::assemble_teardown
+				scope.define_variable(variable_name); // Value left on the stack but cleaned up later by Scope::assemble_teardown
 			}
 		}
 	}
@@ -204,12 +242,12 @@ impl Expression {
 				scope.level -= 1;
 			}
 			Expression::Load(variable_name) => {
-				if let Some(index) = scope.variables.iter().position(|r| r == variable_name) {
-					let relative = (scope.level + (scope.variables.len() - index - 1) as u32) as u8;
-					program.peek(relative);
+				if let Some(relative) = scope.index_of(variable_name) {
+					println!("Index of {} is {}", variable_name, relative);
+					program.peek(relative as u8);
 					scope.level += 1;
 				} else {
-					panic!("variable not found")
+					panic!("variable not found: {}", variable_name)
 				}
 			}
 		}
