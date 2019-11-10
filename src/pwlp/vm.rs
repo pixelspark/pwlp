@@ -1,17 +1,18 @@
 use super::instructions::{Binary, Prefix, Unary};
 use super::program::Program;
 use rand::Rng;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 impl Program {
+	/** Run a program. Note, this is not deterministic (e.g. contains calls to current time, random number generation)
+	 * so not suitable to use in tests. */
 	pub fn run(&self) {
 		let mut rng = rand::thread_rng();
 		let mut pc = 0;
 		let mut stack: Vec<u32> = vec![];
+		let start_time = SystemTime::now();
 
 		let get_length_result = 123;
-		let get_precise_time_result = 1337;
-		let get_wall_time_result = 1338;
-
 		let mut instruction_count = 0;
 
 		while pc < self.code.len() {
@@ -160,8 +161,22 @@ impl Program {
 					}
 					Prefix::USER => match postfix {
 						0 => stack.push(get_length_result),
-						1 => stack.push(get_wall_time_result),
-						2 => stack.push(get_precise_time_result),
+						1 => {
+							// GET_WALL_TIME
+							let time = SystemTime::now()
+								.duration_since(UNIX_EPOCH)
+								.unwrap()
+								.as_secs();
+							stack.push((time & std::u32::MAX as u64) as u32); // Wrap around when we exceed u32::MAX
+						}
+						2 => {
+							// GET_PRECISE_TIME
+							let time = SystemTime::now()
+								.duration_since(start_time)
+								.unwrap()
+								.as_millis();
+							stack.push((time & std::u32::MAX as u128) as u32); // Wrap around when we exceed u32::MAX
+						}
 						3 => {
 							let v = stack.last().unwrap();
 							let idx = v & 0xFF;
