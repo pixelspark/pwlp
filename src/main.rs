@@ -135,7 +135,7 @@ fn main() -> std::io::Result<()> {
 
 		let global_secret = config
 			.secret
-			.unwrap_or(String::from("secret"))
+			.unwrap_or_else(|| String::from("secret"))
 			.as_bytes()
 			.to_owned();
 
