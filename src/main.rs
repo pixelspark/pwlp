@@ -1,4 +1,5 @@
 mod pwlp;
+mod test;
 extern crate clap;
 
 use clap::{App, Arg, SubCommand};

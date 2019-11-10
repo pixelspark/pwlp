@@ -357,7 +357,6 @@ mod tests {
 			let mut scope = Scope::new();
 			n.assemble(&mut program, &mut scope);
 			scope.assemble_teardown(&mut program);
-			println!("Program:\n{:?}", &mut program);
 		}
 	}
 }
