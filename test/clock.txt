@@ -1,0 +1,9 @@
+loop {
+	x = get_wall_time % get_length;
+	for(y=get_length) {
+		set_pixel(y-1, 0, 0, 0);
+	};
+	set_pixel(x, 255, 255, 255);
+	blit;
+	yield;
+}
