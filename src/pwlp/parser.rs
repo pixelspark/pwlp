@@ -144,7 +144,13 @@ fn multiplication(input: &str) -> IResult<&str, Expression> {
 
 	fold_many0(
 		pair(
-			alt((tag("*"), tag("/"), tag("%"), tag("<<"), tag(">>"))),
+			terminated(
+				preceded(
+					sp,
+					alt((tag("*"), tag("/"), tag("%"), tag("<<"), tag(">>"))),
+				),
+				sp,
+			),
 			term,
 		),
 		init,
