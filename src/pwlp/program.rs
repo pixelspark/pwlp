@@ -1,8 +1,10 @@
 use std::fmt;
-use std::io::Write;
+use std::io::{Write, Read};
+use std::fs::File;
 
 use super::instructions::{Binary, Prefix, Special, Unary, UserCommand};
 
+#[derive(Clone)]
 pub struct Program {
 	pub(crate) code: Vec<u8>,
 	pub(crate) stack_size: i32,
@@ -14,6 +16,16 @@ impl Program {
 	fn write(&mut self, buffer: &[u8]) -> &mut Program {
 		self.code.write_all(buffer).unwrap();
 		self
+	}
+
+	pub fn from_file(path: &str) -> std::io::Result<Program> {
+		let mut stored_bin = Vec::<u8>::new();
+		File::open(path)?.read_to_end(&mut stored_bin)?;
+		Ok(Program {
+			code : stored_bin,
+			stack_size: 0,
+			offset: 0
+		})
 	}
 
 	pub fn new() -> Program {

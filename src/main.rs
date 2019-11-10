@@ -17,11 +17,13 @@ use std::net::UdpSocket;
 struct Config {
 	bind_address: Option<String>,
 	secret: Option<String>,
+	program: Option<String>,
 	devices: Option<HashMap<String, DeviceConfig>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 struct DeviceConfig {
+	program: Option<String>,
 	secret: Option<String>,
 }
 
@@ -103,39 +105,6 @@ fn main() -> std::io::Result<()> {
 			Err(s) => println!("Error: {}", s),
 		};
 	} else if let Some(matches) = matches.subcommand_matches("serve") {
-		let mut program = Program::new();
-		program
-			.push(0) // let counter = 0
-			.repeat_forever(|p| {
-				// while(true)
-				p.inc() // counter++
-					.get_length() // let length = get_length()
-					.r#mod() // counter % length
-					.get_length() // let led_counter = get_length()
-					.repeat(|q| {
-						// while(--led_counter)
-						q.dup()
-							.peek(2)
-							.lte() // led_counter <= length
-							.if_zero(|r| {
-								r.peek(1)
-									.push(0xFF_00_00_00)
-									.or() // led_value = 0xFF000000 | led_counter
-									.set_pixel() // set_pixel(led_value)
-									.pop(1);
-							})
-							.if_not_zero(|r| {
-								r.peek(1).push(0x00_FF_00_00).or().set_pixel().pop(1);
-							})
-							.pop(1);
-					})
-					.blit()
-					.pop(1)
-					.r#yield();
-			});
-
-		println!("Program:\n{:?}", program);
-
 		// Start server
 		// Figure out bind address and open socket
 		let config_bind_address = config
@@ -144,13 +113,46 @@ fn main() -> std::io::Result<()> {
 		let bind_address = matches.value_of("bind").unwrap_or(&config_bind_address);
 		let socket = UdpSocket::bind(bind_address).expect("could not bind to socket");
 
-		let default_secret = String::from("secret");
-		let global_secret = config
-			.secret
-			.unwrap_or(default_secret)
-			.as_bytes()
-			.to_owned();
-
+		let global_secret = config.secret.unwrap_or(String::from("secret")).as_bytes().to_owned();
+		
+		let default_program = match config.program {
+			Some(path) => Program::from_file(&path).expect("error reading program file"),
+			None => {
+				// Use a hardcoded default program
+				let mut program = Program::new();
+				program
+					.push(0) // let counter = 0
+					.repeat_forever(|p| {
+						// while(true)
+						p.inc() // counter++
+							.get_length() // let length = get_length()
+							.r#mod() // counter % length
+							.get_length() // let led_counter = get_length()
+							.repeat(|q| {
+								// while(--led_counter)
+								q.dup()
+									.peek(2)
+									.lte() // led_counter <= length
+									.if_zero(|r| {
+										r.peek(1)
+											.push(0xFF_00_00_00)
+											.or() // led_value = 0xFF000000 | led_counter
+											.set_pixel() // set_pixel(led_value)
+											.pop(1);
+									})
+									.if_not_zero(|r| {
+										r.peek(1).push(0x00_FF_00_00).or().set_pixel().pop(1);
+									})
+									.pop(1);
+							})
+							.blit()
+							.pop(1)
+							.r#yield();
+					});
+				program
+			}
+		};
+		println!("Default program:\n{:?}", default_program);
 		println!("PWLP server listening at {}", bind_address);
 
 		loop {
@@ -209,11 +211,23 @@ fn main() -> std::io::Result<()> {
 										println!("Send pong failed: {:?}", t);
 									}
 
+									let device_program = if let Some(config) = &device_config {
+										if let Some(path) = &config.program {
+											Program::from_file(&path).expect("error loading device-specific program")
+										}
+										else {
+											default_program.clone()
+										}
+									}
+									else {
+										default_program.clone()
+									};
+
 									let run = Message {
 										message_type: MessageType::Run,
 										unix_time: m.unix_time,
 										mac_address: MacAddress::nil(),
-										payload: Some(program.code.clone()),
+										payload: Some(device_program.code),
 									};
 
 									if let Err(t) =
