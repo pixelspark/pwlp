@@ -219,7 +219,7 @@ impl Expression {
 						instructions::Binary::GTE => Some(if lhc >= rhc { 1 } else { 0 }),
 						instructions::Binary::OR => Some(lhc | rhc),
 						instructions::Binary::XOR => Some(lhc ^ rhc),
-						instructions::Binary::AND => Some(lhc & rhc)
+						instructions::Binary::AND => Some(lhc & rhc),
 					}
 				} else {
 					None

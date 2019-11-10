@@ -55,7 +55,10 @@ fn compare_output_of_compiler_to_stored_binaries() {
 						// Verify disassembly is equal
 						let dis_path = name.path().with_extension("dis");
 						let mut stored_dis = String::new();
-						File::open(dis_path).unwrap().read_to_string(&mut stored_dis).unwrap();
+						File::open(dis_path)
+							.unwrap()
+							.read_to_string(&mut stored_dis)
+							.unwrap();
 						let my_dis = format!("{:?}\n", prg);
 						assert_eq!(my_dis, stored_dis);
 					}
