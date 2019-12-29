@@ -6,8 +6,8 @@ use clap::{App, AppSettings, Arg, SubCommand};
 use eui48::MacAddress;
 use pwlp::parser::parse;
 use pwlp::program::Program;
-use pwlp::{Message, MessageType};
 use pwlp::vm::VM;
+use pwlp::{Message, MessageType};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
@@ -66,12 +66,16 @@ fn main() -> std::io::Result<()> {
 					.takes_value(true)
 					.help("the file to run")
 				)
-				.arg(
-					Arg::with_name("binary")
+				.arg(Arg::with_name("binary")
 						.short("b")
 						.long("binary")
 						.takes_value(false)
-						.help("interpret source as binary")
+						.help("interpret source as binary"))
+				.arg(Arg::with_name("trace")
+						.short("t")
+						.long("trace")
+						.takes_value(false)
+						.help("show instructions as they are executed")
 				),
 		)
 		.subcommand(
@@ -116,7 +120,6 @@ fn main() -> std::io::Result<()> {
 	// Find out which subcommand to perform
 	if let Some(run_matches) = matches.subcommand_matches("run") {
 		let interpret_as_binary = run_matches.is_present("binary");
-		println!("BINARY: {:?} {}", interpret_as_binary, run_matches.occurrences_of("binary"));
 
 		let program = if interpret_as_binary {
 			let mut source = Vec::<u8>::new();
@@ -126,25 +129,20 @@ fn main() -> std::io::Result<()> {
 				stdin().read_to_end(&mut source)?;
 			}
 			Program::from_binary(source)
-		}
-		else {
+		} else {
 			let mut source = String::new();
 			if let Some(source_file) = run_matches.value_of("file") {
 				File::open(source_file)?.read_to_string(&mut source)?;
 			} else {
 				stdin().read_to_string(&mut source)?;
 			}
-			println!("Parse {}", source);
 			match parse(&source) {
 				Ok(prg) => prg,
-				Err(s) => {
-					panic!("Parsing failed: {}", s)
-				}
+				Err(s) => panic!("Parsing failed: {}", s),
 			}
 		};
 
-		println!("Running program: {:?}", program);
-		let mut vm = VM::new();
+		let mut vm = VM::new(run_matches.is_present("trace"));
 		vm.run(&program);
 	}
 	if let Some(matches) = matches.subcommand_matches("compile") {

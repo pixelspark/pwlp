@@ -4,12 +4,12 @@ use rand::Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct VM {
-
+	trace: bool,
 }
 
 impl VM {
-	pub fn new() -> VM {
-		VM {}
+	pub fn new(trace: bool) -> VM {
+		VM { trace }
 	}
 
 	/** Run a program. Note, this is not deterministic (e.g. contains calls to current time, random number generation)
@@ -28,7 +28,10 @@ impl VM {
 			if let Some(i) = ins {
 				instruction_count += 1;
 				let postfix = program.code[pc] & 0x0F;
-				print!("{:04}.\t{:02x}\t{}", pc, program.code[pc], i);
+
+				if self.trace {
+					print!("{:04}.\t{:02x}\t{}", pc, program.code[pc], i);
+				}
 
 				match i {
 					Prefix::PUSHI => {
@@ -38,7 +41,10 @@ impl VM {
 								| u32::from(program.code[pc + 3]) << 16
 								| u32::from(program.code[pc + 4]) << 24;
 							stack.push(value);
-							print!("\tv={}", value);
+
+							if self.trace {
+								print!("\tv={}", value);
+							}
 							pc += 4;
 						}
 					}
@@ -48,7 +54,9 @@ impl VM {
 						} else {
 							for _ in 0..postfix {
 								pc += 1;
-								print!("\tv={}", program.code[pc]);
+								if self.trace {
+									print!("\tv={}", program.code[pc]);
+								}
 								stack.push(u32::from(program.code[pc]));
 							}
 						}
@@ -60,7 +68,9 @@ impl VM {
 					}
 					Prefix::PEEK => {
 						let val = stack[stack.len() - (postfix as usize) - 1];
-						print!("\tindex={} v={}", postfix, val);
+						if self.trace {
+							print!("\tindex={} v={}", postfix, val);
+						}
 						stack.push(val);
 					}
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
@@ -87,7 +97,10 @@ impl VM {
 							}
 							_ => unreachable!(),
 						};
-						println!();
+
+						if self.trace {
+							println!();
+						}
 						continue;
 					}
 					Prefix::BINARY => {
@@ -147,7 +160,9 @@ impl VM {
 								}
 							})
 						} else {
-							println!("invalid binary postfix: {}", postfix);
+							if self.trace {
+								println!("invalid binary postfix: {}", postfix);
+							}
 							break;
 						}
 					}
@@ -163,7 +178,9 @@ impl VM {
 								Unary::SHR8 => lhs >> 8,
 							});
 						} else {
-							println!("invalid binary postfix: {}", postfix);
+							if self.trace {
+								println!("invalid binary postfix: {}", postfix);
+							}
 							break;
 						}
 					}
@@ -191,15 +208,23 @@ impl VM {
 							let r = ((v >> 8) as u32) & 0xFF;
 							let g = ((v >> 16) as u32) & 0xFF;
 							let b = ((v >> 24) as u32) & 0xFF;
-							print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
+							if self.trace {
+								print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
+							}
 						}
-						4 => print!("\tblit"),
+						4 => {
+							if self.trace {
+								print!("\tblit");
+							}
+						}
 						5 => {
 							let v = stack.pop().unwrap();
 							stack.push(rng.gen_range(0, v));
 						}
 						_ => {
-							print!("\t(unknown user function)");
+							if self.trace {
+								print!("\t(unknown user function)");
+							}
 							break;
 						}
 					},
@@ -211,17 +236,30 @@ impl VM {
 							15 => "twobyte",
 							_ => unimplemented!(),
 						};
-						print!("\t{}", name);
+
+						if self.trace {
+							print!("\t{}", name);
+						}
 					}
 				}
 			} else {
-				println!("{:04}.\t{:02x}\tUnknown instruction\n", pc, program.code[pc]);
+				if self.trace {
+					println!(
+						"{:04}.\t{:02x}\tUnknown instruction\n",
+						pc, program.code[pc]
+					);
+				}
 				break;
 			}
 
-			println!("\tstack: {:?}", stack);
+			if self.trace {
+				println!("\tstack: {:?}", stack);
+			}
 			pc += 1;
 		}
-		println!("Ended; {} instructions executed", instruction_count);
+
+		if self.trace {
+			println!("Ended; {} instructions executed", instruction_count);
+		}
 	}
 }

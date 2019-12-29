@@ -19,7 +19,7 @@ pub enum Node {
 pub struct Scope<'a> {
 	variables: Vec<String>,
 	level: u32,
-	parent: Option<&'a Scope<'a>>
+	parent: Option<&'a Scope<'a>>,
 }
 
 impl<'a> Scope<'a> {
@@ -27,7 +27,7 @@ impl<'a> Scope<'a> {
 		Scope {
 			variables: vec![],
 			level: 0,
-			parent: None
+			parent: None,
 		}
 	}
 
@@ -35,7 +35,7 @@ impl<'a> Scope<'a> {
 		Scope {
 			parent: Some(&self),
 			level: 0,
-			variables: vec![]
+			variables: vec![],
 		}
 	}
 
@@ -44,25 +44,21 @@ impl<'a> Scope<'a> {
 			Some(_) => {
 				self.assemble_teardown(program);
 				self.parent = None
-			},
-			None => panic!("cannot unnest scope without parent")
+			}
+			None => panic!("cannot unnest scope without parent"),
 		}
 	}
 
 	pub fn index_of(&self, variable_name: &String) -> Option<u32> {
 		if let Some(i) = self.variables.iter().position(|r| r == variable_name) {
 			Some(self.level - 1 - (i as u32))
-		}
-		else {
+		} else {
 			if let Some(p) = self.parent {
 				match p.index_of(variable_name) {
-					Some(p_index) => {
-						Some(p_index + self.level)
-					},
-					None => None
+					Some(p_index) => Some(p_index + self.level),
+					None => None,
 				}
-			}
-			else {
+			} else {
 				None
 			}
 		}
@@ -171,7 +167,7 @@ impl Node {
 				program.pop(1);
 				scope.level = old_level;
 			}
-			Node::IfElse(e, if_statements, else_statements) => {	
+			Node::IfElse(e, if_statements, else_statements) => {
 				let old_level = scope.level;
 				e.assemble(program, scope);
 				program.if_not_zero(|q| {
@@ -243,7 +239,7 @@ impl Expression {
 			}
 			Expression::Load(variable_name) => {
 				if let Some(relative) = scope.index_of(variable_name) {
-					println!("Index of {} is {}", variable_name, relative);
+					//println!("Index of {} is {}", variable_name, relative);
 					program.peek(relative as u8);
 					scope.level += 1;
 				} else {
