@@ -18,3 +18,6 @@ pub use vm::*;
 
 pub mod ast;
 pub use ast::*;
+
+pub mod strip;
+pub use strip::*;

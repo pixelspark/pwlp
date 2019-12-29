@@ -2,14 +2,16 @@ use super::instructions::{Binary, Prefix, Unary};
 use super::program::Program;
 use rand::Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
+use super::strip::Strip;
 
 pub struct VM {
 	trace: bool,
+	strip: Box<dyn Strip>
 }
 
 impl VM {
-	pub fn new(trace: bool) -> VM {
-		VM { trace }
+	pub fn new(strip: Box<dyn Strip>, trace: bool) -> VM {
+		VM { trace, strip }
 	}
 
 	/** Run a program. Note, this is not deterministic (e.g. contains calls to current time, random number generation)
@@ -20,7 +22,6 @@ impl VM {
 		let mut stack: Vec<u32> = vec![];
 		let start_time = SystemTime::now();
 
-		let get_length_result = 123;
 		let mut instruction_count = 0;
 
 		while pc < program.code.len() {
@@ -185,7 +186,7 @@ impl VM {
 						}
 					}
 					Prefix::USER => match postfix {
-						0 => stack.push(get_length_result),
+						0 => stack.push(self.strip.length() as u32),
 						1 => {
 							// GET_WALL_TIME
 							let time = SystemTime::now()
@@ -204,18 +205,20 @@ impl VM {
 						}
 						3 => {
 							let v = stack.last().unwrap();
-							let idx = v & 0xFF;
-							let r = ((v >> 8) as u32) & 0xFF;
-							let g = ((v >> 16) as u32) & 0xFF;
-							let b = ((v >> 24) as u32) & 0xFF;
+							let idx = (v & 0xFF) as u8;
+							let r = (((v >> 8) as u32) & 0xFF) as u8;
+							let g = (((v >> 16) as u32) & 0xFF) as u8;
+							let b = (((v >> 24) as u32) & 0xFF) as u8;
 							if self.trace {
 								print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
 							}
+							self.strip.set_pixel(idx, r, g, b);
 						}
 						4 => {
 							if self.trace {
 								print!("\tblit");
 							}
+							self.strip.blit();
 						}
 						5 => {
 							let v = stack.pop().unwrap();

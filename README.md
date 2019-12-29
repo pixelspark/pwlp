@@ -1,5 +1,17 @@
 # Pixelspark Wireless Led Protocol (PWLP) server
 
+## Building
+
+Regular build:
+````sh
+cargo build
+````
+
+For Raspberry Pi:
+````sh
+cargo build --target=arm-unknown-linux-musleabi --features=raspberrypi 
+````
+
 ## Usage
 
 ````
@@ -11,6 +23,15 @@ cat test/random.txt | cargo run -- run
 
 # Serve programs to devices (configure using config.toml)
 cargo run -- serve
+
+# Run a program
+cargo run -- run --binary test/clock.bin
+
+# Run a program on an actual strip with 100 LEDs (SPI bus 0 SS 0) on a Raspberry
+cargo run -- run --binary --hardware -l 100 test/clock.bin
+
+# Run a program on an actual strip with 100 LEDs connected to SPI bus 1 slave select 1 on a Raspberry
+cargo run -- run --binary --hardware --bus 1 --ss 1 -l 100 test/clock.bin
 ````
 
 ## Protocol

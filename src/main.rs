@@ -8,11 +8,18 @@ use pwlp::parser::parse;
 use pwlp::program::Program;
 use pwlp::vm::VM;
 use pwlp::{Message, MessageType};
+use pwlp::strip;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{stdin, Read, Write};
 use std::net::UdpSocket;
+
+#[cfg(feature = "raspberrypi")]
+extern crate rppal;
+
+#[cfg(feature = "raspberrypi")]
+use rppal::spi;
 
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
@@ -71,6 +78,27 @@ fn main() -> std::io::Result<()> {
 						.long("binary")
 						.takes_value(false)
 						.help("interpret source as binary"))
+				.arg(Arg::with_name("hardware")
+						.short("h")
+						.long("hardware")
+						.takes_value(false)
+						.help("output to actual hardware (if supported)"))
+				.arg(Arg::with_name("length")
+						.long("length")
+						.short("l")
+						.takes_value(true)
+						.value_name("10")
+						.help("length of the LED strip"))
+				.arg(Arg::with_name("bus")
+						.long("bus")
+						.takes_value(true)
+						.value_name("0")
+						.help("number of SPI bus to use"))
+				.arg(Arg::with_name("ss")
+						.long("ss")
+						.takes_value(true)
+						.value_name("0")
+						.help("the slave-select port to use for the SPI bus"))
 				.arg(Arg::with_name("trace")
 						.short("t")
 						.long("trace")
@@ -120,6 +148,7 @@ fn main() -> std::io::Result<()> {
 	// Find out which subcommand to perform
 	if let Some(run_matches) = matches.subcommand_matches("run") {
 		let interpret_as_binary = run_matches.is_present("binary");
+		let length = run_matches.value_of("length").unwrap_or("10").parse::<u8>().unwrap();
 
 		let program = if interpret_as_binary {
 			let mut source = Vec::<u8>::new();
@@ -142,8 +171,40 @@ fn main() -> std::io::Result<()> {
 			}
 		};
 
-		let mut vm = VM::new(run_matches.is_present("trace"));
-		vm.run(&program);
+		if cfg!(feature = "raspberrypi") && run_matches.is_present("hardware") {
+			#[cfg(feature = "raspberrypi")]
+			{
+				let spi_bus = match run_matches.value_of("bus") {
+					Some(bus_str) => match bus_str {
+						"0" => spi::Bus::Spi0,
+						"1" => spi::Bus::Spi1,
+						"2" => spi::Bus::Spi2,
+						_ => panic!("invalid SPI bus number (should be 0, 1 or 2)")
+					},
+					None => spi::Bus::Spi0
+				};
+
+				let ss = match run_matches.value_of("ss") {
+					Some(ss_str) => match ss_str {
+						"0" => spi::SlaveSelect::Ss0,
+						"1" => spi::SlaveSelect::Ss1,
+						"2" => spi::SlaveSelect::Ss2,
+						_ => panic!("invalid SS number (should be 0, 1 or 2)")
+					},
+					None => spi::SlaveSelect::Ss0
+				};
+
+				let spi = spi::Spi::new(spi_bus, ss, 1_000_000, spi::Mode::Mode0).expect("spi bus could not be created");
+				let strip = strip::spi_strip::SPIStrip::new(spi, length);
+				let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));
+				vm.run(&program);
+			}
+		}
+		else {
+			let strip = strip::DummyStrip::new(length, true);
+			let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));
+			vm.run(&program);
+		}
 	}
 	if let Some(matches) = matches.subcommand_matches("compile") {
 		let mut source = String::new();
@@ -166,7 +227,7 @@ fn main() -> std::io::Result<()> {
 		};
 	} else if let Some(matches) = matches.subcommand_matches("disassemble") {
 		let mut source = Vec::<u8>::new();
-		if let Some(source_file) = matches.value_of("binary") {
+		if let Some(source_file) = matches.value_of("file") {
 			File::open(source_file)?.read_to_end(&mut source)?;
 		} else {
 			stdin().read_to_end(&mut source)?;
