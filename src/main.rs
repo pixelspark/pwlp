@@ -7,6 +7,7 @@ use eui48::MacAddress;
 use pwlp::parser::parse;
 use pwlp::program::Program;
 use pwlp::{Message, MessageType};
+use pwlp::vm::VM;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
@@ -53,12 +54,26 @@ fn main() -> std::io::Result<()> {
 				.about("disassemble binary file to instructions")
 				.arg(
 					Arg::with_name("file")
-						.index(1)
 						.takes_value(true)
-						.help("the file to disassemble"),
+						.help("the binary to disassemble"),
 				),
 		)
-		.subcommand(SubCommand::with_name("run").about("run a script"))
+		.subcommand(
+			SubCommand::with_name("run")
+				.about("run a script")
+				.arg(Arg::with_name("file")
+					.index(1)
+					.takes_value(true)
+					.help("the file to run")
+				)
+				.arg(
+					Arg::with_name("binary")
+						.short("b")
+						.long("binary")
+						.takes_value(false)
+						.help("interpret source as binary")
+				),
+		)
 		.subcommand(
 			SubCommand::with_name("serve")
 				.about("start server")
@@ -99,18 +114,38 @@ fn main() -> std::io::Result<()> {
 		.get_matches();
 
 	// Find out which subcommand to perform
-	if let Some(_matches) = matches.subcommand_matches("run") {
-		let mut source = String::new();
-		stdin().read_to_string(&mut source)?;
+	if let Some(run_matches) = matches.subcommand_matches("run") {
+		let interpret_as_binary = run_matches.is_present("binary");
+		println!("BINARY: {:?} {}", interpret_as_binary, run_matches.occurrences_of("binary"));
 
-		match parse(&source) {
-			Ok(prg) => {
-				println!("Program:\n{:?}", &prg);
-				println!("Run:");
-				prg.run();
+		let program = if interpret_as_binary {
+			let mut source = Vec::<u8>::new();
+			if let Some(source_file) = run_matches.value_of("file") {
+				File::open(source_file)?.read_to_end(&mut source)?;
+			} else {
+				stdin().read_to_end(&mut source)?;
 			}
-			Err(s) => println!("Error: {}", s),
+			Program::from_binary(source)
+		}
+		else {
+			let mut source = String::new();
+			if let Some(source_file) = run_matches.value_of("file") {
+				File::open(source_file)?.read_to_string(&mut source)?;
+			} else {
+				stdin().read_to_string(&mut source)?;
+			}
+			println!("Parse {}", source);
+			match parse(&source) {
+				Ok(prg) => prg,
+				Err(s) => {
+					panic!("Parsing failed: {}", s)
+				}
+			}
 		};
+
+		println!("Running program: {:?}", program);
+		let mut vm = VM::new();
+		vm.run(&program);
 	}
 	if let Some(matches) = matches.subcommand_matches("compile") {
 		let mut source = String::new();
@@ -133,7 +168,7 @@ fn main() -> std::io::Result<()> {
 		};
 	} else if let Some(matches) = matches.subcommand_matches("disassemble") {
 		let mut source = Vec::<u8>::new();
-		if let Some(source_file) = matches.value_of("file") {
+		if let Some(source_file) = matches.value_of("binary") {
 			File::open(source_file)?.read_to_end(&mut source)?;
 		} else {
 			stdin().read_to_end(&mut source)?;

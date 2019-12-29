@@ -3,10 +3,18 @@ use super::program::Program;
 use rand::Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-impl Program {
+pub struct VM {
+
+}
+
+impl VM {
+	pub fn new() -> VM {
+		VM {}
+	}
+
 	/** Run a program. Note, this is not deterministic (e.g. contains calls to current time, random number generation)
 	 * so not suitable to use in tests. */
-	pub fn run(&self) {
+	pub fn run(&mut self, program: &Program) {
 		let mut rng = rand::thread_rng();
 		let mut pc = 0;
 		let mut stack: Vec<u32> = vec![];
@@ -15,20 +23,20 @@ impl Program {
 		let get_length_result = 123;
 		let mut instruction_count = 0;
 
-		while pc < self.code.len() {
-			let ins = Prefix::from(self.code[pc]);
+		while pc < program.code.len() {
+			let ins = Prefix::from(program.code[pc]);
 			if let Some(i) = ins {
 				instruction_count += 1;
-				let postfix = self.code[pc] & 0x0F;
-				print!("{:04}.\t{:02x}\t{}", pc, self.code[pc], i);
+				let postfix = program.code[pc] & 0x0F;
+				print!("{:04}.\t{:02x}\t{}", pc, program.code[pc], i);
 
 				match i {
 					Prefix::PUSHI => {
 						for _ in 0..postfix {
-							let value = u32::from(self.code[pc + 1])
-								| u32::from(self.code[pc + 2]) << 8
-								| u32::from(self.code[pc + 3]) << 16
-								| u32::from(self.code[pc + 4]) << 24;
+							let value = u32::from(program.code[pc + 1])
+								| u32::from(program.code[pc + 2]) << 8
+								| u32::from(program.code[pc + 3]) << 16
+								| u32::from(program.code[pc + 4]) << 24;
 							stack.push(value);
 							print!("\tv={}", value);
 							pc += 4;
@@ -40,8 +48,8 @@ impl Program {
 						} else {
 							for _ in 0..postfix {
 								pc += 1;
-								print!("\tv={}", self.code[pc]);
-								stack.push(u32::from(self.code[pc]));
+								print!("\tv={}", program.code[pc]);
+								stack.push(u32::from(program.code[pc]));
 							}
 						}
 					}
@@ -56,8 +64,8 @@ impl Program {
 						stack.push(val);
 					}
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
-						let target = (u32::from(self.code[pc + 1])
-							| (u32::from(self.code[pc + 2]) << 8)) as usize;
+						let target = (u32::from(program.code[pc + 1])
+							| (u32::from(program.code[pc + 2]) << 8)) as usize;
 
 						pc = match i {
 							Prefix::JMP => target,
@@ -207,7 +215,7 @@ impl Program {
 					}
 				}
 			} else {
-				println!("{:04}.\t{:02x}\tUnknown instruction\n", pc, self.code[pc]);
+				println!("{:04}.\t{:02x}\tUnknown instruction\n", pc, program.code[pc]);
 				break;
 			}
 
