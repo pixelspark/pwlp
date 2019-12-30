@@ -160,9 +160,11 @@ impl Node {
 				let old_level = scope.level;
 				e.assemble(program, scope);
 				program.if_not_zero(|q| {
+					let mut child_scope = scope.nest();
 					for i in ss.iter() {
-						i.assemble(q, scope);
+						i.assemble(q, &mut child_scope);
 					}
+					child_scope.unnest(q);
 				});
 				program.pop(1);
 				scope.level = old_level;
@@ -171,14 +173,18 @@ impl Node {
 				let old_level = scope.level;
 				e.assemble(program, scope);
 				program.if_not_zero(|q| {
+					let mut child_scope = scope.nest();
 					for i in if_statements.iter() {
-						i.assemble(q, scope);
+						i.assemble(q, &mut child_scope);
 					}
+					child_scope.unnest(q);
 				});
 				program.if_zero(|q| {
+					let mut child_scope = scope.nest();
 					for i in else_statements.iter() {
-						i.assemble(q, scope);
+						i.assemble(q, &mut child_scope);
 					}
+					child_scope.unnest(q);
 				});
 				program.pop(1);
 				scope.level = old_level;
