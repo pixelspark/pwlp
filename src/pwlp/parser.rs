@@ -116,12 +116,14 @@ fn binaries(input: &str) -> IResult<&str, Expression> {
 	let (input, init) = addition(input)?;
 
 	fold_many0(
-		pair(alt((tag("|"), tag("^"), tag("&"))), addition),
+		pair(terminated(preceded(sp, alt((tag("|"), tag("^"), tag("&"), tag(">>"), tag("<<")))), sp), addition),
 		init,
 		|acc, (op, val): (&str, Expression)| match op {
 			"&" => Expression::Binary(Box::new(acc), instructions::Binary::AND, Box::new(val)),
 			"|" => Expression::Binary(Box::new(acc), instructions::Binary::OR, Box::new(val)),
 			"^" => Expression::Binary(Box::new(acc), instructions::Binary::XOR, Box::new(val)),
+			">>" => Expression::Binary(Box::new(acc), instructions::Binary::SHR, Box::new(val)),
+			"<<" => Expression::Binary(Box::new(acc), instructions::Binary::SHL, Box::new(val)),
 			_ => unreachable!(),
 		},
 	)(input)

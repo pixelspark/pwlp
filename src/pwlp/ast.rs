@@ -277,6 +277,8 @@ impl Expression {
 						instructions::Binary::OR => Some(lhc | rhc),
 						instructions::Binary::XOR => Some(lhc ^ rhc),
 						instructions::Binary::AND => Some(lhc & rhc),
+						instructions::Binary::SHL => Some(lhc << rhc),
+						instructions::Binary::SHR => Some(lhc >> rhc),
 					}
 				} else {
 					None

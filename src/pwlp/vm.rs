@@ -116,6 +116,8 @@ impl VM {
 								Binary::MOD => lhs % rhs,
 								Binary::AND => lhs & rhs,
 								Binary::OR => lhs | rhs,
+								Binary::SHL => lhs << rhs,
+								Binary::SHR => lhs >> rhs,
 								Binary::XOR => lhs ^ rhs,
 								Binary::EQ => {
 									if lhs == rhs {

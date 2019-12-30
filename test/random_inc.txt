@@ -6,7 +6,8 @@ loop {
 	for(n=get_length) {
 		if(n == lucky) {
 			p = get_pixel(n);
-			set_pixel(n, 255, 0xFF & 0xFF00, 255);
+			r = (p & 0xFF00);
+			set_pixel(n, 255, 0xFF|0xFF00, 255);
 		}
 	};
 	blit;

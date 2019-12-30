@@ -124,6 +124,8 @@ pub enum Binary {
 	LTE = 11,
 	EQ = 12,
 	NEQ = 13,
+	SHL = 14,
+	SHR = 15
 }
 
 impl Binary {
@@ -143,6 +145,8 @@ impl Binary {
 			11 => Some(Binary::LTE),
 			12 => Some(Binary::EQ),
 			13 => Some(Binary::NEQ),
+			14 => Some(Binary::SHL),
+			15 => Some(Binary::SHR),
 			_ => None,
 		}
 	}
@@ -168,6 +172,8 @@ impl std::fmt::Display for Binary {
 				Binary::OR => "OR",
 				Binary::SUB => "SUB",
 				Binary::XOR => "XOR",
+				Binary::SHL => "SHL",
+				Binary::SHR => "SHR"
 			}
 		)
 	}
