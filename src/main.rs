@@ -6,9 +6,9 @@ use clap::{App, AppSettings, Arg, SubCommand};
 use eui48::MacAddress;
 use pwlp::parser::parse;
 use pwlp::program::Program;
+use pwlp::strip;
 use pwlp::vm::VM;
 use pwlp::{Message, MessageType};
-use pwlp::strip;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
@@ -148,7 +148,11 @@ fn main() -> std::io::Result<()> {
 	// Find out which subcommand to perform
 	if let Some(run_matches) = matches.subcommand_matches("run") {
 		let interpret_as_binary = run_matches.is_present("binary");
-		let length = run_matches.value_of("length").unwrap_or("10").parse::<u8>().unwrap();
+		let length = run_matches
+			.value_of("length")
+			.unwrap_or("10")
+			.parse::<u8>()
+			.unwrap();
 
 		let program = if interpret_as_binary {
 			let mut source = Vec::<u8>::new();
@@ -179,9 +183,9 @@ fn main() -> std::io::Result<()> {
 						"0" => spi::Bus::Spi0,
 						"1" => spi::Bus::Spi1,
 						"2" => spi::Bus::Spi2,
-						_ => panic!("invalid SPI bus number (should be 0, 1 or 2)")
+						_ => panic!("invalid SPI bus number (should be 0, 1 or 2)"),
 					},
-					None => spi::Bus::Spi0
+					None => spi::Bus::Spi0,
 				};
 
 				let ss = match run_matches.value_of("ss") {
@@ -189,18 +193,18 @@ fn main() -> std::io::Result<()> {
 						"0" => spi::SlaveSelect::Ss0,
 						"1" => spi::SlaveSelect::Ss1,
 						"2" => spi::SlaveSelect::Ss2,
-						_ => panic!("invalid SS number (should be 0, 1 or 2)")
+						_ => panic!("invalid SS number (should be 0, 1 or 2)"),
 					},
-					None => spi::SlaveSelect::Ss0
+					None => spi::SlaveSelect::Ss0,
 				};
 
-				let spi = spi::Spi::new(spi_bus, ss, 1_000_000, spi::Mode::Mode0).expect("spi bus could not be created");
+				let spi = spi::Spi::new(spi_bus, ss, 1_000_000, spi::Mode::Mode0)
+					.expect("spi bus could not be created");
 				let strip = strip::spi_strip::SPIStrip::new(spi, length);
 				let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));
 				vm.run(&program);
 			}
-		}
-		else {
+		} else {
 			let strip = strip::DummyStrip::new(length, true);
 			let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));
 			vm.run(&program);

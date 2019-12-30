@@ -125,7 +125,7 @@ pub enum Binary {
 	EQ = 12,
 	NEQ = 13,
 	SHL = 14,
-	SHR = 15
+	SHR = 15,
 }
 
 impl Binary {
@@ -173,7 +173,7 @@ impl std::fmt::Display for Binary {
 				Binary::SUB => "SUB",
 				Binary::XOR => "XOR",
 				Binary::SHL => "SHL",
-				Binary::SHR => "SHR"
+				Binary::SHR => "SHR",
 			}
 		)
 	}
@@ -188,5 +188,5 @@ pub enum UserCommand {
 	SET_PIXEL = 3,
 	BLIT = 4,
 	RANDOM_INT = 5,
-	GET_PIXEL = 6
+	GET_PIXEL = 6,
 }

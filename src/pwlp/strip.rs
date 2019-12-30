@@ -1,7 +1,7 @@
 pub struct Color {
 	pub r: u8,
 	pub g: u8,
-	pub b:u8
+	pub b: u8,
 }
 
 pub trait Strip {
@@ -14,7 +14,7 @@ pub trait Strip {
 pub struct DummyStrip {
 	trace: bool,
 	length: u8,
-	data: Vec<u8>
+	data: Vec<u8>,
 }
 
 impl DummyStrip {
@@ -22,7 +22,7 @@ impl DummyStrip {
 		DummyStrip {
 			trace,
 			length,
-			data: vec![0u8; (length as usize) * 3]
+			data: vec![0u8; (length as usize) * 3],
 		}
 	}
 }
@@ -44,14 +44,19 @@ impl Strip for DummyStrip {
 		Color {
 			r: self.data[(idx as usize) * 3],
 			g: self.data[(idx as usize) * 3 + 1],
-			b: self.data[(idx as usize) * 3 + 2]
+			b: self.data[(idx as usize) * 3 + 2],
 		}
 	}
 
 	fn blit(&mut self) {
 		if self.trace {
 			for idx in 0..self.length {
-				print!("{:02x}{:02x}{:02x} ", self.data[(idx as usize) * 3], self.data[(idx as usize) * 3 + 1], self.data[(idx as usize) * 3 + 2]);
+				print!(
+					"{:02x}{:02x}{:02x} ",
+					self.data[(idx as usize) * 3],
+					self.data[(idx as usize) * 3 + 1],
+					self.data[(idx as usize) * 3 + 2]
+				);
 			}
 			println!("");
 		}
@@ -64,7 +69,7 @@ pub mod spi_strip {
 	pub struct SPIStrip {
 		spi: Spi,
 		data: Vec<u8>,
-		length: u8
+		length: u8,
 	}
 
 	impl SPIStrip {
@@ -72,7 +77,7 @@ pub mod spi_strip {
 			SPIStrip {
 				spi,
 				length,
-				data: vec![0u8; (length as usize) * 3]
+				data: vec![0u8; (length as usize) * 3],
 			}
 		}
 	}
@@ -87,7 +92,7 @@ pub mod spi_strip {
 			Color {
 				r: self.data[(idx as usize) * 3],
 				g: self.data[(idx as usize) * 3 + 1],
-				b: self.data[(idx as usize) * 3 + 2]
+				b: self.data[(idx as usize) * 3 + 2],
 			}
 		}
 

@@ -64,7 +64,12 @@ fn bracketed_expression(input: &str) -> IResult<&str, Expression> {
 }
 
 fn term(input: &str) -> IResult<&str, Expression> {
-	alt((literal, user_expression, load_expression, bracketed_expression))(input)
+	alt((
+		literal,
+		user_expression,
+		load_expression,
+		bracketed_expression,
+	))(input)
 }
 
 fn comparison(input: &str) -> IResult<&str, Expression> {
@@ -116,7 +121,16 @@ fn binaries(input: &str) -> IResult<&str, Expression> {
 	let (input, init) = addition(input)?;
 
 	fold_many0(
-		pair(terminated(preceded(sp, alt((tag("|"), tag("^"), tag("&"), tag(">>"), tag("<<")))), sp), addition),
+		pair(
+			terminated(
+				preceded(
+					sp,
+					alt((tag("|"), tag("^"), tag("&"), tag(">>"), tag("<<"))),
+				),
+				sp,
+			),
+			addition,
+		),
 		init,
 		|acc, (op, val): (&str, Expression)| match op {
 			"&" => Expression::Binary(Box::new(acc), instructions::Binary::AND, Box::new(val)),
@@ -165,6 +179,12 @@ fn multiplication(input: &str) -> IResult<&str, Expression> {
 			"/" => Expression::Binary(Box::new(acc), instructions::Binary::DIV, Box::new(val)),
 			"%" => Expression::Binary(Box::new(acc), instructions::Binary::MOD, Box::new(val)),
 			"<<" | ">>" => {
+				let binary_op = match op {
+					"<<" => instructions::Binary::SHL,
+					">>" => instructions::Binary::SHR,
+					_ => unreachable!()
+				};
+
 				if let Expression::Literal(n) = val {
 					let unary = match op {
 						"<<" => instructions::Unary::SHL8,
@@ -180,10 +200,10 @@ fn multiplication(input: &str) -> IResult<&str, Expression> {
 						}
 						expr
 					} else {
-						panic!("cannot shift by other quantities than multiples of 8")
+						Expression::Binary(Box::new(acc), binary_op, Box::new(val))
 					}
 				} else {
-					panic!("cannot shift by dynamic quantities")
+					Expression::Binary(Box::new(acc), binary_op, Box::new(val))
 				}
 			}
 			_ => unreachable!(),
