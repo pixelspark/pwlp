@@ -87,6 +87,7 @@ impl Program {
 			UserCommand::BLIT => 0,
 			UserCommand::SET_PIXEL => 0,
 			UserCommand::RANDOM_INT => 0,
+			UserCommand::GET_PIXEL => 0,
 		};
 		self.write(&[Prefix::USER as u8 | u as u8]) // SPECIAL u
 	}
@@ -374,6 +375,7 @@ impl fmt::Debug for Program {
 							3 => "set_pixel",
 							4 => "blit",
 							5 => "random_int",
+							6 => "get_pixel",
 							_ => "(unknown user function)",
 						};
 						write!(f, "\t{}", name)?;

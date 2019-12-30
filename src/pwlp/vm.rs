@@ -213,17 +213,29 @@ impl VM {
 								print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
 							}
 							self.strip.set_pixel(idx, r, g, b);
-						}
+						},
 						4 => {
 							if self.trace {
 								print!("\tblit");
 							}
 							self.strip.blit();
-						}
+						},
 						5 => {
+							// RANDOM_INT
 							let v = stack.pop().unwrap();
 							stack.push(rng.gen_range(0, v));
-						}
+						},
+						6 => {
+							// GET_PIXEL
+							let v = stack.pop().unwrap();
+							let color = self.strip.get_pixel((v& 0xFF) as u8);
+							let color_value = 
+								(v & 0xFF) |
+								(color.r as u32) << 8 |
+								(color.g as u32) << 16 |
+								(color.b as u32) << 24;
+							stack.push(color_value);
+						},
 						_ => {
 							if self.trace {
 								print!("\t(unknown user function)");

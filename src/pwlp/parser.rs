@@ -236,6 +236,9 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 		map(tuple((tag("random("), expression, tag(")"))), |t| {
 			Expression::UserCall(instructions::UserCommand::RANDOM_INT, vec![t.1])
 		}),
+		map(tuple((tag("get_pixel("), expression, tag(")"))), |t| {
+			Expression::UserCall(instructions::UserCommand::GET_PIXEL, vec![t.1])
+		}),
 		map(tag("get_length"), |_| {
 			Expression::User(instructions::UserCommand::GET_LENGTH)
 		}),

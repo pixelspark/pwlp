@@ -55,6 +55,7 @@ Consecutive statements are separated by ";". Supported constructs:
   * `yield`
 * User commands:
   * `set_pixel(expression)`
+  * `get_pixel(index)`
   * `set_pixel(i, r, g, b)`: equivalent to `set_pixel(i | r<<8 | g<<16 | b<<24)`
   * `random(expression)`: return a random number between zero and `expression`, inclusive
   * `get_length`: the length of the strip
