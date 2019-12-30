@@ -1,3 +1,4 @@
 for(n=get_length){
 	set_pixel(n-1,255,0,0)
-}
+};
+blit;
