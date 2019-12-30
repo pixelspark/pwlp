@@ -198,7 +198,7 @@ fn main() -> std::io::Result<()> {
 					None => spi::SlaveSelect::Ss0,
 				};
 
-				let spi = spi::Spi::new(spi_bus, ss, 1_000_000, spi::Mode::Mode0)
+				let spi = spi::Spi::new(spi_bus, ss, 4_000_000, spi::Mode::Mode0)
 					.expect("spi bus could not be created");
 				let strip = strip::spi_strip::SPIStrip::new(spi, length);
 				let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));

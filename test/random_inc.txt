@@ -7,8 +7,17 @@ loop {
 		if(n == lucky) {
 			p = get_pixel(n);
 			r = (p & 0xFF00) >> 8;
-			set_pixel(n, r+1, 0, 0);
+			set_pixel(n, (r+1)&0xFF, 0, 0);
+		}
+	};
+	luckyb = random(get_length);
+	for(n=get_length) {
+		if(n == luckyb) {
+			p = get_pixel(n);
+			r = (p & 0xFF00) >> 8;
+			set_pixel(n, (r-1)&0xFF, 0, 0);
 		}
 	};
 	blit;
+	yield;
 }

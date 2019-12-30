@@ -2,7 +2,7 @@ use super::instructions::{Binary, Prefix, Unary};
 use super::program::Program;
 use super::strip::Strip;
 use rand::Rng;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 pub struct VM {
 	trace: bool,
@@ -21,6 +21,9 @@ impl VM {
 		let mut pc = 0;
 		let mut stack: Vec<u32> = vec![];
 		let start_time = SystemTime::now();
+		let fps = 60;
+		let frame_time = Duration::from_millis(1000 / fps);
+		let mut last_yield_time = SystemTime::now();
 
 		let mut instruction_count = 0;
 
@@ -244,15 +247,49 @@ impl VM {
 						}
 					},
 					Prefix::SPECIAL => {
-						let name = match postfix {
-							12 => "swap",
-							13 => "dump",
-							14 => "yield",
-							15 => "twobyte",
-							_ => unimplemented!(),
-						};
+						match postfix {
+							12 => {
+								// SWAP
+								panic!("SWAP not implemented");
+							},
+							13 => {
+								// DUMP
+								println!("DUMP: {:?}", stack);
+							},
+							14 => {
+								// YIELD
+								let now = SystemTime::now();
+								let passed = now.duration_since(last_yield_time).unwrap();
+								if passed < frame_time {
+									if self.trace {
+										print!("\t{}ms passed, {}ms frame time, {}ms left to wait", passed.as_millis(), frame_time.as_millis(), (frame_time - passed).as_millis());
+									}
+									// We have some time left
+									std::thread::sleep(frame_time - passed);
+								}
+								else {
+									if self.trace {
+										print!("{}ms passed, {}ms frame time, no time left to wait", passed.as_millis(), frame_time.as_millis());
+									}
+								}
+								last_yield_time = now;
+							},
+							15 => {
+								// TWOBYTE
+								panic!("Two-byte instructions not implemented nor valid");
+							},
+							_ => unimplemented!()
+						}
 
 						if self.trace {
+							let name = match postfix {
+								12 => "swap",
+								13 => "dump",
+								14 => "yield",
+								15 => "twobyte",
+								_ => unimplemented!(),
+							};
+
 							print!("\t{}", name);
 						}
 					}

@@ -66,6 +66,7 @@ impl Strip for DummyStrip {
 #[cfg(feature = "raspberrypi")]
 pub mod spi_strip {
 	use rppal::spi::Spi;
+	use super::Color;
 	pub struct SPIStrip {
 		spi: Spi,
 		data: Vec<u8>,
