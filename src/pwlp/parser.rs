@@ -59,8 +59,12 @@ fn load_expression(input: &str) -> IResult<&str, Expression> {
 	map(variable_name, |v| Expression::Load(v.to_string()))(input)
 }
 
+fn bracketed_expression(input: &str) -> IResult<&str, Expression> {
+	preceded(tag("("), terminated(expression, tag(")")))(input)
+}
+
 fn term(input: &str) -> IResult<&str, Expression> {
-	alt((literal, user_expression, load_expression))(input)
+	alt((literal, user_expression, load_expression, bracketed_expression))(input)
 }
 
 fn comparison(input: &str) -> IResult<&str, Expression> {
