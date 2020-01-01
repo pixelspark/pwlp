@@ -2,10 +2,10 @@ loop {
 	for(i = get_length) {
 		for(j = get_length) {
 			if(i == j) {
-				set_pixel(j, 255, 0, 0);
+				set_pixel(j-1, 255, 0, 0);
 			}
 			else {
-				set_pixel(j, 0, 0, 0);
+				set_pixel(j-1, 0, 0, 0);
 			};
 		};
 		blit

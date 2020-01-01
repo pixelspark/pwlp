@@ -33,14 +33,14 @@ impl Strip for DummyStrip {
 	}
 
 	fn set_pixel(&mut self, idx: u8, r: u8, g: u8, b: u8) {
-		assert!(idx < self.length, "set_pixel: index exceeds strip length");
+		assert!(idx < self.length, "set_pixel: index {} exceeds strip length {}", idx, self.length);
 		self.data[(idx as usize) * 3] = r;
 		self.data[(idx as usize) * 3 + 1] = g;
 		self.data[(idx as usize) * 3 + 2] = b;
 	}
 
 	fn get_pixel(&self, idx: u8) -> Color {
-		assert!(idx < self.length, "set_pixel: index exceeds strip length");
+		assert!(idx < self.length, "get_pixel: index {} exceeds strip length {}", idx, self.length);
 		Color {
 			r: self.data[(idx as usize) * 3],
 			g: self.data[(idx as usize) * 3 + 1],
@@ -65,8 +65,8 @@ impl Strip for DummyStrip {
 
 #[cfg(feature = "raspberrypi")]
 pub mod spi_strip {
-	use rppal::spi::Spi;
 	use super::Color;
+	use rppal::spi::Spi;
 	pub struct SPIStrip {
 		spi: Spi,
 		data: Vec<u8>,
@@ -89,7 +89,7 @@ pub mod spi_strip {
 		}
 
 		fn get_pixel(&self, idx: u8) -> Color {
-			assert!(idx < self.length, "set_pixel: index exceeds strip length");
+			assert!(idx < self.length, "get_pixel: index {} exceeds strip length {}", idx, self.length);
 			Color {
 				r: self.data[(idx as usize) * 3],
 				g: self.data[(idx as usize) * 3 + 1],
@@ -98,7 +98,7 @@ pub mod spi_strip {
 		}
 
 		fn set_pixel(&mut self, idx: u8, r: u8, g: u8, b: u8) {
-			assert!(idx < self.length, "set_pixel: index exceeds strip length");
+			assert!(idx < self.length, "set_pixel: index {} exceeds strip length {}", idx, self.length);
 			self.data[(idx as usize) * 3] = r;
 			self.data[(idx as usize) * 3 + 1] = g;
 			self.data[(idx as usize) * 3 + 2] = b;

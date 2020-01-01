@@ -2,7 +2,7 @@ use super::instructions::{Binary, Prefix, Unary};
 use super::program::Program;
 use super::strip::Strip;
 use rand::Rng;
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub struct VM {
 	trace: bool,
@@ -71,6 +71,12 @@ impl VM {
 						}
 					}
 					Prefix::PEEK => {
+						assert!(
+							(postfix as usize) < stack.len(),
+							"cannot peek beyond stack (index {} > stack size {})!",
+							postfix,
+							stack.len()
+						);
 						let val = stack[stack.len() - (postfix as usize) - 1];
 						if self.trace {
 							print!("\tindex={} v={}", postfix, val);
@@ -250,35 +256,46 @@ impl VM {
 						match postfix {
 							12 => {
 								// SWAP
-								panic!("SWAP not implemented");
-							},
+								let lhs = stack.pop().unwrap();
+								let rhs = stack.pop().unwrap();
+								stack.push(lhs);
+								stack.push(rhs);
+							}
 							13 => {
 								// DUMP
 								println!("DUMP: {:?}", stack);
-							},
+							}
 							14 => {
 								// YIELD
 								let now = SystemTime::now();
 								let passed = now.duration_since(last_yield_time).unwrap();
 								if passed < frame_time {
 									if self.trace {
-										print!("\t{}ms passed, {}ms frame time, {}ms left to wait", passed.as_millis(), frame_time.as_millis(), (frame_time - passed).as_millis());
+										print!(
+											"\t{}ms passed, {}ms frame time, {}ms left to wait",
+											passed.as_millis(),
+											frame_time.as_millis(),
+											(frame_time - passed).as_millis()
+										);
 									}
 									// We have some time left
 									std::thread::sleep(frame_time - passed);
-								}
-								else {
+								} else {
 									if self.trace {
-										print!("{}ms passed, {}ms frame time, no time left to wait", passed.as_millis(), frame_time.as_millis());
+										print!(
+											"{}ms passed, {}ms frame time, no time left to wait",
+											passed.as_millis(),
+											frame_time.as_millis()
+										);
 									}
 								}
 								last_yield_time = now;
-							},
+							}
 							15 => {
 								// TWOBYTE
 								panic!("Two-byte instructions not implemented nor valid");
-							},
-							_ => unimplemented!()
+							}
+							_ => unimplemented!(),
 						}
 
 						if self.trace {

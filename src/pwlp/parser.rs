@@ -7,7 +7,7 @@ use nom::{
 	IResult,
 };
 
-use super::ast::{Expression, Node, Scope};
+use super::ast::{Expression, Intrinsic, Node, Scope};
 use super::instructions;
 use super::program::Program;
 
@@ -182,7 +182,7 @@ fn multiplication(input: &str) -> IResult<&str, Expression> {
 				let binary_op = match op {
 					"<<" => instructions::Binary::SHL,
 					">>" => instructions::Binary::SHR,
-					_ => unreachable!()
+					_ => unreachable!(),
 				};
 
 				if let Expression::Literal(n) = val {
@@ -275,6 +275,7 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 			Expression::User(instructions::UserCommand::GET_PRECISE_TIME)
 		}),
 		/* Compiler intrinsics: 'functions' that simply compile to an expression  */
+		// irgb(i, r, g, b) => color value (0xBBGGRRII)
 		map(
 			tuple((
 				tag("irgb("),
@@ -316,11 +317,27 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 				*root
 			},
 		),
+		// clamp(value, min, max): 
+		map(
+			tuple((
+				tag("clamp("),
+				preceded(sp, terminated(expression, sp)),
+				tag(","),
+				preceded(sp, terminated(expression, sp)),
+				tag(","),
+				preceded(sp, terminated(expression, sp)),
+				tag(")"),
+			)),
+			|t| {
+				Expression::Intrinsic(Intrinsic::Clamp(Box::new(t.1), Box::new(t.3), Box::new(t.5)))
+			},
+		),
+		// index(color value) => index (i.e. 0xBBGGRRII => 0xII)
 		map(tuple((tag("index("), expression, tag(")"))), |t| {
 			// x & 0xFF
 			Expression::Binary(
 				Box::new(t.1),
-				instructions::Binary::AND, 
+				instructions::Binary::AND,
 				Box::new(Expression::Literal(0xFF))
 			)
 		}),
@@ -331,7 +348,7 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 					instructions::Unary::SHR8,
 					Box::new(t.1)
 				)),
-				instructions::Binary::AND, 
+				instructions::Binary::AND,
 				Box::new(Expression::Literal(0xFF))
 			)
 		}),
@@ -345,7 +362,7 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 						Box::new(t.1)
 					))
 				)),
-				instructions::Binary::AND, 
+				instructions::Binary::AND,
 				Box::new(Expression::Literal(0xFF))
 			)
 		}),
@@ -362,7 +379,7 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 						))
 					))
 				)),
-				instructions::Binary::AND, 
+				instructions::Binary::AND,
 				Box::new(Expression::Literal(0xFF))
 			)
 		}),

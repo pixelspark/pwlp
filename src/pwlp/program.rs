@@ -54,6 +54,12 @@ impl Program {
 		self.write(&[Prefix::POP as u8 | n]) // POP n
 	}
 
+	/* This can be used to allow fragments (i.e. in a branch arm) to modify the stack size */
+	pub fn leave_on_stack(&mut self, n: i32) -> &mut Program {
+		self.stack_size -= n;
+		self
+	}
+
 	pub fn peek(&mut self, n: u8) -> &mut Program {
 		assert!(n <= 15, "cannot peek more than 15 stack items");
 		self.stack_size += 1;
@@ -102,8 +108,8 @@ impl Program {
 			offset: self.current_pc(),
 		};
 		builder(&mut fragment);
-		assert!(
-			fragment.stack_size == 0,
+		assert_eq!(
+			fragment.stack_size, 0,
 			"fragment in branch cannot modify stack size"
 		);
 

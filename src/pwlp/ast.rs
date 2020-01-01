@@ -105,7 +105,9 @@ impl Node {
 			Node::UserCall(s, e) => {
 				match s {
 					instructions::UserCommand::SET_PIXEL => {
+						let pre_level = scope.level;
 						for (n, param) in e.iter().enumerate() {
+							let mut old_level = scope.level;
 							param.assemble(program, scope);
 							for _ in 0..n {
 								program.unary(instructions::Unary::SHL8);
@@ -113,8 +115,12 @@ impl Node {
 
 							if n > 0 {
 								program.or();
+							} else {
+								old_level += 1
 							}
+							scope.level = old_level;
 						}
+						scope.level = pre_level;
 					}
 					_ => {
 						for param in e.iter() {
@@ -124,7 +130,6 @@ impl Node {
 				}
 				program.user(*s);
 				program.pop(1);
-				scope.level -= (e.len()) as u32;
 			}
 			Node::Statements(stmts) => {
 				for i in stmts.iter() {
@@ -198,6 +203,11 @@ impl Node {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum Intrinsic {
+	Clamp(Box<Expression>, Box<Expression>, Box<Expression>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
 	Literal(u32),
 	Unary(instructions::Unary, Box<Expression>),
@@ -205,6 +215,7 @@ pub enum Expression {
 	User(instructions::UserCommand),
 	UserCall(instructions::UserCommand, Vec<Expression>),
 	Load(String),
+	Intrinsic(Intrinsic),
 }
 
 impl Expression {
@@ -245,11 +256,58 @@ impl Expression {
 			}
 			Expression::Load(variable_name) => {
 				if let Some(relative) = scope.index_of(variable_name) {
-					//println!("Index of {} is {}", variable_name, relative);
+					// println!("Index of {} is {}", variable_name, relative);
 					program.peek(relative as u8);
 					scope.level += 1;
 				} else {
 					panic!("variable not found: {}", variable_name)
+				}
+			}
+			Expression::Intrinsic(intrinsic) => {
+				match intrinsic {
+					Intrinsic::Clamp(value, min, max) => {
+						let old_level = scope.level;
+						value.assemble(program, scope); // [value]
+						min.assemble(program, scope); // [min, value]
+						program.peek(1); // [value, min, value]
+						program.peek(1); // [min, value, min, value]
+						program.binary(instructions::Binary::LT); // [value < min, min, value]
+
+						// value < min
+						program.if_not_zero(|b| {
+							b.pop(1); // [min, value]
+							b.swap(); // [value, min]
+							b.pop(1); // [min]
+							b.leave_on_stack(-2);
+						});
+
+						// value >= min
+						program.if_zero(|b| {
+							b.pop(2); // [value]
+							b.leave_on_stack(-2);
+						});
+
+						max.assemble(program, scope); // [max, previous_result]
+						program.peek(1); // [previous_result, max, previous_result]
+						program.peek(1); // [max, previous_result, max, previous_result]
+						program.binary(instructions::Binary::GT); // [previous_result > max, max, previous_result]
+
+						// previous_result > max
+						program.if_not_zero(|b| {
+							b.pop(1); // [max, previous_result]
+							b.swap(); // [previous_result, max]
+							b.pop(1); // [max]
+							b.leave_on_stack(-2);
+						});
+
+						// previous_result <= max
+						program.if_zero(|b| {
+							b.pop(2); // [previous_result]
+							b.leave_on_stack(-2);
+						});
+
+						scope.level = old_level;
+					}
 				}
 			}
 		}
@@ -291,12 +349,34 @@ impl Expression {
 						instructions::Unary::INC => Some(c.overflowing_add(1).0),
 						instructions::Unary::DEC => Some(c.overflowing_sub(1).0),
 						instructions::Unary::NOT => Some(!c),
-						instructions::Unary::NEG => None,  // TODO
+						instructions::Unary::NEG => None, // TODO
 						instructions::Unary::SHL8 => Some(c << 8),
-						instructions::Unary::SHR8 => Some(c << 8)
+						instructions::Unary::SHR8 => Some(c << 8),
 					}
 				} else {
 					None
+				}
+			}
+
+			Expression::Intrinsic(intrinsic) => {
+				match intrinsic {
+					Intrinsic::Clamp(value, min, max) => {
+						// When all parameters are constant we don't have to think long
+						if let (Some(c_value), Some(c_min), Some(c_max)) =
+							(value.const_value(), min.const_value(), max.const_value())
+						{
+							let mut result = c_value;
+							if result < c_min {
+								result = c_min;
+							}
+							if result > c_max {
+								result = c_max;
+							}
+							Some(result)
+						} else {
+							None
+						}
+					}
 				}
 			}
 		}

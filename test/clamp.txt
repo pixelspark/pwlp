@@ -1,0 +1,3 @@
+a=20;
+set_pixel(1, clamp(a, 0, 10), a, a);
+blit;
