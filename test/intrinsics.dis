@@ -1,4 +1,4 @@
-0000.	31	PUSHI	[aa, bb, cc, dd]
+0000.	31	PUSHI	[14, bb, cc, dd]
 0005.	20	PEEKB	0
 0006.	11	PUSHB	[ff]
 0008.	85	BINARY	AND

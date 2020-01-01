@@ -292,8 +292,8 @@ impl Expression {
 						instructions::Unary::DEC => Some(c.overflowing_sub(1).0),
 						instructions::Unary::NOT => Some(!c),
 						instructions::Unary::NEG => None,  // TODO
-						instructions::Unary::SHL8 => None, // TODO
-						instructions::Unary::SHR8 => None, // TODO
+						instructions::Unary::SHL8 => Some(c << 8),
+						instructions::Unary::SHR8 => Some(c << 8)
 					}
 				} else {
 					None
