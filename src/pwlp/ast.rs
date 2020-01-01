@@ -49,31 +49,29 @@ impl<'a> Scope<'a> {
 		}
 	}
 
-	pub fn index_of(&self, variable_name: &String) -> Option<u32> {
+	pub fn index_of(&self, variable_name: &str) -> Option<u32> {
 		if let Some(i) = self.variables.iter().position(|r| r == variable_name) {
 			Some(self.level - 1 - (i as u32))
-		} else {
-			if let Some(p) = self.parent {
-				match p.index_of(variable_name) {
-					Some(p_index) => Some(p_index + self.level),
-					None => None,
-				}
-			} else {
-				None
+		} else if let Some(p) = self.parent {
+			match p.index_of(variable_name) {
+				Some(p_index) => Some(p_index + self.level),
+				None => None,
 			}
+		} else {
+			None
 		}
 	}
 
-	pub fn define_variable(&mut self, variable_name: &String) {
+	pub fn define_variable(&mut self, variable_name: &str) {
 		if self.variables.iter().any(|r| r == variable_name) {
 			panic!("variable already defined")
 		}
 
-		self.variables.push(variable_name.clone());
+		self.variables.push(variable_name.to_string());
 		// A variable was already pushed, but we are now counting it througn variables.len()
 	}
 
-	pub fn undefine_variable(&mut self, variable_name: &String) {
+	pub fn undefine_variable(&mut self, variable_name: &str) {
 		if let Some(p) = self.variables.iter().position(|r| r == variable_name) {
 			self.variables.remove(p);
 		} else {

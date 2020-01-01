@@ -211,8 +211,7 @@ impl VM {
 							// GET_WALL_TIME
 							if deterministic {
 								stack.push((instruction_count / 10) as u32);
-							}
-							else {
+							} else {
 								let time = SystemTime::now()
 									.duration_since(UNIX_EPOCH)
 									.unwrap()
@@ -224,8 +223,7 @@ impl VM {
 							// GET_PRECISE_TIME
 							if deterministic {
 								stack.push(instruction_count as u32);
-							}
-							else {
+							} else {
 								let time = SystemTime::now()
 									.duration_since(start_time)
 									.unwrap()
@@ -255,8 +253,7 @@ impl VM {
 							let v = stack.pop().unwrap();
 							if deterministic {
 								stack.push(deterministic_rng.gen_range(0, v));
-							}
-							else {
+							} else {
 								stack.push(rng.gen_range(0, v));
 							}
 						}
@@ -304,15 +301,14 @@ impl VM {
 									}
 									// We have some time left
 									std::thread::sleep(frame_time - passed);
-								} else {
-									if self.trace {
-										print!(
-											"{}ms passed, {}ms frame time, no time left to wait",
-											passed.as_millis(),
-											frame_time.as_millis()
-										);
-									}
+								} else if self.trace {
+									print!(
+										"{}ms passed, {}ms frame time, no time left to wait",
+										passed.as_millis(),
+										frame_time.as_millis()
+									);
 								}
+
 								last_yield_time = now;
 							}
 							15 => {

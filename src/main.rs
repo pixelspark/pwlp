@@ -185,9 +185,14 @@ fn main() -> std::io::Result<()> {
 		};
 
 		let limit: Option<u64> = if run_matches.is_present("instruction-limit") {
-			Some(run_matches.value_of("instruction-limit").unwrap().parse::<u64>().expect("invalid limit number"))
-		}
-		else {
+			Some(
+				run_matches
+					.value_of("instruction-limit")
+					.unwrap()
+					.parse::<u64>()
+					.expect("invalid limit number"),
+			)
+		} else {
 			None
 		};
 
