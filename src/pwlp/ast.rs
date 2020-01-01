@@ -287,6 +287,8 @@ impl Expression {
 							b.leave_on_stack(-2);
 						});
 
+						program.leave_on_stack(2);
+
 						max.assemble(program, scope); // [max, previous_result]
 						program.peek(1); // [previous_result, max, previous_result]
 						program.peek(1); // [max, previous_result, max, previous_result]
@@ -306,6 +308,9 @@ impl Expression {
 							b.leave_on_stack(-2);
 						});
 
+						program.leave_on_stack(2);
+						
+						println!("Ss after clamp: {}", program.stack_size);
 						scope.level = old_level;
 					}
 				}

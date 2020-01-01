@@ -1,0 +1,5 @@
+for(n=get_length) {
+	p = get_pixel(n);
+	r = (p & 0xFF00) >> 8;
+	set_pixel(n, clamp(r,1,255)-1, 0, 0);
+};

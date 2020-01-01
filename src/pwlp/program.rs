@@ -149,7 +149,7 @@ impl Program {
 		builder(&mut fragment);
 		assert!(
 			fragment.stack_size == 0,
-			"fragment in loop cannot modify stack size"
+			"fragment in forever loop cannot modify stack size"
 		);
 
 		let start = self.current_pc();
