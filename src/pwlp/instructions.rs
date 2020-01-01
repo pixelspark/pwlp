@@ -1,6 +1,7 @@
 use std::fmt;
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum Prefix {
 	POP = 0x0,
 	PUSHB = 0x10,

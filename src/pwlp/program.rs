@@ -80,7 +80,7 @@ impl Program {
 			Special::DUMP => 0,
 			Special::SWAP => 0,
 			Special::YIELD => 0,
-			Special::TWOBYTE => 0,
+			Special::TWOBYTE => unimplemented!(),
 		};
 		self.write(&[Prefix::SPECIAL as u8 | u as u8]) // SPECIAL u
 	}

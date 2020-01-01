@@ -309,8 +309,6 @@ impl Expression {
 						});
 
 						program.leave_on_stack(2);
-						
-						println!("Ss after clamp: {}", program.stack_size);
 						scope.level = old_level;
 					}
 				}
