@@ -5,147 +5,137 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+pub struct State<'a> {
+	vm: &'a mut VM,
+	program: Program,
+	pc: usize,
+	stack: Vec<u32>
+}
+
 pub struct VM {
 	trace: bool,
 	strip: Box<dyn Strip>,
-	instruction_limit: Option<u64>,
-	deterministic: bool,
+	deterministic: bool
 }
 
-impl VM {
-	pub fn new(strip: Box<dyn Strip>) -> VM {
-		VM {
-			trace: false,
-			strip,
-			instruction_limit: None,
-			deterministic: false,
+impl<'a> State<'a> {
+	fn new(vm: &'a mut VM, program: Program) -> State<'a> {
+		State {
+			vm,
+			program,
+			pc: 0,
+			stack: vec![]
 		}
 	}
 
-	pub fn set_trace(&mut self, trace: bool) {
-		self.trace = trace
-	}
-
-	pub fn set_deterministic(&mut self, d: bool) {
-		self.deterministic = d
-	}
-
-	pub fn set_instruction_limit(&mut self, limit: Option<u64>) {
-		self.instruction_limit = limit
-	}
-
-	/** Run a program. Note, this is not deterministic (e.g. contains calls to current time, random number generation)
-	 * so not suitable to use in tests. */
-	pub fn run(&mut self, program: &Program) {
+	pub fn run(&mut self, instruction_limit: Option<usize>) {
 		let mut rng = rand::thread_rng();
 		let mut deterministic_rng = ChaCha20Rng::from_seed([0u8; 32]);
-		let mut pc = 0;
-		let mut stack: Vec<u32> = vec![];
 		let start_time = SystemTime::now();
 		let fps = 60;
 		let frame_time = Duration::from_millis(1000 / fps);
 		let mut last_yield_time = SystemTime::now();
 
-		let mut instruction_count = 0u64;
+		let mut instruction_count = 0;
 
-		while pc < program.code.len() {
+		while self.pc < self.program.code.len() {
 			// Enforce instruction count limit
-			if let Some(limit) = self.instruction_limit {
+			if let Some(limit) = instruction_limit {
 				if instruction_count >= limit {
 					break;
 				}
 			}
 
-			let ins = Prefix::from(program.code[pc]);
+			let ins = Prefix::from(self.program.code[self.pc]);
 			if let Some(i) = ins {
 				instruction_count += 1;
-				let postfix = program.code[pc] & 0x0F;
+				let postfix = self.program.code[self.pc] & 0x0F;
 
-				if self.trace {
-					print!("{:04}.\t{:02x}\t{}", pc, program.code[pc], i);
+				if self.vm.trace {
+					print!("{:04}.\t{:02x}\t{}", self.pc, self.program.code[self.pc], i);
 				}
 
 				match i {
 					Prefix::PUSHI => {
 						for _ in 0..postfix {
-							let value = u32::from(program.code[pc + 1])
-								| u32::from(program.code[pc + 2]) << 8
-								| u32::from(program.code[pc + 3]) << 16
-								| u32::from(program.code[pc + 4]) << 24;
-							stack.push(value);
+							let value = u32::from(self.program.code[self.pc + 1])
+								| u32::from(self.program.code[self.pc + 2]) << 8
+								| u32::from(self.program.code[self.pc + 3]) << 16
+								| u32::from(self.program.code[self.pc + 4]) << 24;
+							self.stack.push(value);
 
-							if self.trace {
+							if self.vm.trace {
 								print!("\tv={}", value);
 							}
-							pc += 4;
+							self.pc += 4;
 						}
 					}
 					Prefix::PUSHB => {
 						if postfix == 0 {
-							stack.push(0);
+							self.stack.push(0);
 						} else {
 							for _ in 0..postfix {
-								pc += 1;
-								if self.trace {
-									print!("\tv={}", program.code[pc]);
+								self.pc += 1;
+								if self.vm.trace {
+									print!("\tv={}", self.program.code[self.pc]);
 								}
-								stack.push(u32::from(program.code[pc]));
+								self.stack.push(u32::from(self.program.code[self.pc]));
 							}
 						}
 					}
 					Prefix::POP => {
 						for _ in 0..postfix {
-							let _ = stack.pop();
+							let _ = self.stack.pop();
 						}
 					}
 					Prefix::PEEK => {
 						assert!(
-							(postfix as usize) < stack.len(),
+							(postfix as usize) < self.stack.len(),
 							"cannot peek beyond stack (index {} > stack size {})!",
 							postfix,
-							stack.len()
+							self.stack.len()
 						);
-						let val = stack[stack.len() - (postfix as usize) - 1];
-						if self.trace {
+						let val = self.stack[self.stack.len() - (postfix as usize) - 1];
+						if self.vm.trace {
 							print!("\tindex={} v={}", postfix, val);
 						}
-						stack.push(val);
+						self.stack.push(val);
 					}
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
-						let target = (u32::from(program.code[pc + 1])
-							| (u32::from(program.code[pc + 2]) << 8)) as usize;
+						let target = (u32::from(self.program.code[self.pc + 1])
+							| (u32::from(self.program.code[self.pc + 2]) << 8)) as usize;
 
-						pc = match i {
+						self.pc = match i {
 							Prefix::JMP => target,
 							Prefix::JZ => {
-								let head = stack.last().unwrap();
+								let head = self.stack.last().unwrap();
 								if *head == 0 {
 									target
 								} else {
-									pc + 3
+									self.pc + 3
 								}
 							}
 							Prefix::JNZ => {
-								let head = stack.last().unwrap();
+								let head = self.stack.last().unwrap();
 								if *head != 0 {
 									target
 								} else {
-									pc + 3
+									self.pc + 3
 								}
 							}
 							_ => unreachable!(),
 						};
 
-						if self.trace {
+						if self.vm.trace {
 							println!();
 						}
 						continue;
 					}
 					Prefix::BINARY => {
 						if let Some(op) = Binary::from(postfix) {
-							let rhs = stack.pop().unwrap();
-							let lhs = stack.pop().unwrap();
-							stack.push(match op {
+							let rhs = self.stack.pop().unwrap();
+							let lhs = self.stack.pop().unwrap();
+							self.stack.push(match op {
 								Binary::ADD => lhs + rhs,
 								Binary::SUB => lhs - rhs,
 								Binary::MUL => lhs * rhs,
@@ -200,7 +190,7 @@ impl VM {
 								}
 							})
 						} else {
-							if self.trace {
+							if self.vm.trace {
 								println!("invalid binary postfix: {}", postfix);
 							}
 							break;
@@ -208,8 +198,8 @@ impl VM {
 					}
 					Prefix::UNARY => {
 						if let Some(op) = Unary::from(postfix) {
-							let lhs = stack.pop().unwrap();
-							stack.push(match op {
+							let lhs = self.stack.pop().unwrap();
+							self.stack.push(match op {
 								Unary::DEC => lhs - 1,
 								Unary::INC => lhs + 1,
 								Unary::NEG => unimplemented!(),
@@ -218,75 +208,75 @@ impl VM {
 								Unary::SHR8 => lhs >> 8,
 							});
 						} else {
-							if self.trace {
+							if self.vm.trace {
 								println!("invalid binary postfix: {}", postfix);
 							}
 							break;
 						}
 					}
 					Prefix::USER => match postfix {
-						0 => stack.push(self.strip.length() as u32),
+						0 => self.stack.push(self.vm.strip.length() as u32),
 						1 => {
 							// GET_WALL_TIME
-							if self.deterministic {
-								stack.push((instruction_count / 10) as u32);
+							if self.vm.deterministic {
+								self.stack.push((instruction_count / 10) as u32);
 							} else {
 								let time = SystemTime::now()
 									.duration_since(UNIX_EPOCH)
 									.unwrap()
 									.as_secs();
-								stack.push((time & std::u32::MAX as u64) as u32); // Wrap around when we exceed u32::MAX
+								self.stack.push((time & std::u32::MAX as u64) as u32); // Wrap around when we exceed u32::MAX
 							}
 						}
 						2 => {
 							// GET_PRECISE_TIME
-							if self.deterministic {
-								stack.push(instruction_count as u32);
+							if self.vm.deterministic {
+								self.stack.push(instruction_count as u32);
 							} else {
 								let time = SystemTime::now()
 									.duration_since(start_time)
 									.unwrap()
 									.as_millis();
-								stack.push((time & std::u32::MAX as u128) as u32); // Wrap around when we exceed u32::MAX
+								self.stack.push((time & std::u32::MAX as u128) as u32); // Wrap around when we exceed u32::MAX
 							}
 						}
 						3 => {
-							let v = stack.last().unwrap();
+							let v = self.stack.last().unwrap();
 							let idx = (v & 0xFF) as u8;
 							let r = (((v >> 8) as u32) & 0xFF) as u8;
 							let g = (((v >> 16) as u32) & 0xFF) as u8;
 							let b = (((v >> 24) as u32) & 0xFF) as u8;
-							if self.trace {
+							if self.vm.trace {
 								print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
 							}
-							self.strip.set_pixel(idx, r, g, b);
+							self.vm.strip.set_pixel(idx, r, g, b);
 						}
 						4 => {
-							if self.trace {
+							if self.vm.trace {
 								print!("\tblit");
 							}
-							self.strip.blit();
+							self.vm.strip.blit();
 						}
 						5 => {
 							// RANDOM_INT
-							let v = stack.pop().unwrap();
-							if self.deterministic {
-								stack.push(deterministic_rng.gen_range(0, v));
+							let v = self.stack.pop().unwrap();
+							if self.vm.deterministic {
+								self.stack.push(deterministic_rng.gen_range(0, v));
 							} else {
-								stack.push(rng.gen_range(0, v));
+								self.stack.push(rng.gen_range(0, v));
 							}
 						}
 						6 => {
 							// GET_PIXEL
-							let v = stack.pop().unwrap();
-							let color = self.strip.get_pixel((v & 0xFF) as u8);
+							let v = self.stack.pop().unwrap();
+							let color = self.vm.strip.get_pixel((v & 0xFF) as u8);
 							let color_value = (v & 0xFF)
 								| (color.r as u32) << 8 | (color.g as u32) << 16
 								| (color.b as u32) << 24;
-							stack.push(color_value);
+							self.stack.push(color_value);
 						}
 						_ => {
-							if self.trace {
+							if self.vm.trace {
 								print!("\t(unknown user function)");
 							}
 							break;
@@ -296,21 +286,21 @@ impl VM {
 						match postfix {
 							12 => {
 								// SWAP
-								let lhs = stack.pop().unwrap();
-								let rhs = stack.pop().unwrap();
-								stack.push(lhs);
-								stack.push(rhs);
+								let lhs = self.stack.pop().unwrap();
+								let rhs = self.stack.pop().unwrap();
+								self.stack.push(lhs);
+								self.stack.push(rhs);
 							}
 							13 => {
 								// DUMP
-								println!("DUMP: {:?}", stack);
+								println!("DUMP: {:?}", self.stack);
 							}
 							14 => {
 								// YIELD
 								let now = SystemTime::now();
 								let passed = now.duration_since(last_yield_time).unwrap();
 								if passed < frame_time {
-									if self.trace {
+									if self.vm.trace {
 										print!(
 											"\t{}ms passed, {}ms frame time, {}ms left to wait",
 											passed.as_millis(),
@@ -320,7 +310,7 @@ impl VM {
 									}
 									// We have some time left
 									std::thread::sleep(frame_time - passed);
-								} else if self.trace {
+								} else if self.vm.trace {
 									print!(
 										"{}ms passed, {}ms frame time, no time left to wait",
 										passed.as_millis(),
@@ -337,7 +327,7 @@ impl VM {
 							_ => unimplemented!(),
 						}
 
-						if self.trace {
+						if self.vm.trace {
 							let name = match postfix {
 								12 => "swap",
 								13 => "dump",
@@ -351,23 +341,45 @@ impl VM {
 					}
 				}
 			} else {
-				if self.trace {
+				if self.vm.trace {
 					println!(
 						"{:04}.\t{:02x}\tUnknown instruction\n",
-						pc, program.code[pc]
+						self.pc, self.program.code[self.pc]
 					);
 				}
 				break;
 			}
 
-			if self.trace {
-				println!("\tstack: {:?}", stack);
+			if self.vm.trace {
+				println!("\tstack: {:?}", self.stack);
 			}
-			pc += 1;
+			self.pc += 1;
 		}
 
-		if self.trace {
+		if self.vm.trace {
 			println!("Ended; {} instructions executed", instruction_count);
 		}
+	}
+}
+
+impl VM {
+	pub fn new(strip: Box<dyn Strip>) -> VM {
+		VM {
+			trace: false,
+			strip,
+			deterministic: false
+		}
+	}
+
+	pub fn set_trace(&mut self, trace: bool) {
+		self.trace = trace
+	}
+
+	pub fn set_deterministic(&mut self, d: bool) {
+		self.deterministic = d
+	}
+
+	pub fn start(&mut self, program: Program) -> State {
+		State::new(self, program)
 	}
 }

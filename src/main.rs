@@ -69,18 +69,6 @@ fn vm_from_options(options: &ArgMatches) -> VM {
 
 	vm.set_trace(options.is_present("trace"));
 	vm.set_deterministic(options.is_present("deterministic"));
-	vm.set_instruction_limit(if options.is_present("instruction-limit") {
-		Some(
-			options
-				.value_of("instruction-limit")
-				.unwrap()
-				.parse::<u64>()
-				.expect("invalid limit number"),
-		)
-	} else {
-		None
-	});
-
 	vm
 }
 
@@ -268,8 +256,21 @@ fn main() -> std::io::Result<()> {
 			}
 		};
 
+		let instruction_limit: Option<usize> = if run_matches.is_present("instruction-limit") {
+			Some(
+				run_matches
+					.value_of("instruction-limit")
+					.unwrap()
+					.parse::<usize>()
+					.expect("invalid limit number"),
+			)
+		} else {
+			None
+		};
+
 		let mut vm = vm_from_options(&run_matches);
-		vm.run(&program);
+		let mut state = vm.start(program);
+		state.run(instruction_limit);
 	} else if let Some(matches) = matches.subcommand_matches("compile") {
 		let mut source = String::new();
 		if let Some(source_file) = matches.value_of("file") {
