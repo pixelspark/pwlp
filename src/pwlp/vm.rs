@@ -2,6 +2,7 @@ use super::instructions::{Binary, Prefix, Unary};
 use super::program::Program;
 use super::strip::Strip;
 use rand::{Rng, SeedableRng};
+use rand::rngs::ThreadRng;
 use rand_chacha::ChaCha20Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -13,6 +14,8 @@ pub struct State<'a> {
 	start_time: SystemTime,
 	instruction_count: usize,
 	instruction_limit: Option<usize>,
+	deterministic_rng: ChaCha20Rng,
+	rng: ThreadRng
 }
 
 pub struct VM {
@@ -37,13 +40,12 @@ impl<'a> State<'a> {
 			start_time: SystemTime::now(),
 			instruction_limit,
 			instruction_count: 0,
+			deterministic_rng: ChaCha20Rng::from_seed([0u8; 32]),
+			rng: rand::thread_rng()
 		}
 	}
 
 	pub fn run(&mut self) -> Outcome {
-		let mut rng = rand::thread_rng();
-		let mut deterministic_rng = ChaCha20Rng::from_seed([0u8; 32]);
-
 		while self.pc < self.program.code.len() {
 			// Enforce instruction count limit
 			if let Some(limit) = self.instruction_limit {
@@ -267,9 +269,9 @@ impl<'a> State<'a> {
 							// RANDOM_INT
 							let v = self.stack.pop().unwrap();
 							if self.vm.deterministic {
-								self.stack.push(deterministic_rng.gen_range(0, v));
+								self.stack.push(self.deterministic_rng.gen_range(0, v));
 							} else {
-								self.stack.push(rng.gen_range(0, v));
+								self.stack.push(self.rng.gen_range(0, v));
 							}
 						}
 						6 => {
