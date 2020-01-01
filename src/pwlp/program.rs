@@ -105,7 +105,7 @@ impl Program {
 		let mut fragment = Program {
 			code: Vec::<u8>::new(),
 			stack_size: 0,
-			offset: self.current_pc(),
+			offset: self.current_pc() + 3,
 		};
 		builder(&mut fragment);
 		assert_eq!(
