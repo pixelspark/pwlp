@@ -12,6 +12,21 @@ For Raspberry Pi:
 cargo build --target=arm-unknown-linux-musleabi --features=raspberrypi 
 ````
 
+To streamline building and uploading to a Raspberry Pi, use [build_pi.sh](./build_pi.sh). Add the following to your SSH 
+config file (~/.ssh/config):
+
+````
+Host rpi
+	HostName raspberrypi.local
+	User pi
+	IdentityFile ~/.ssh/id_rsa
+	StrictHostKeyChecking no
+	UserKnownHostsFile /dev/null
+````
+
+After adding your SSH public key (`~/.ssh/id_rsa.pub`) to `~/.ssh/authorized_keys` on the Pi, you will be able to upload 
+without using a password. If you don't have an SSH key yet, run `ssh-keygen`.
+
 ## Usage
 
 ````
