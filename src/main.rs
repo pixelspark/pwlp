@@ -2,7 +2,7 @@ mod pwlp;
 mod test;
 extern crate clap;
 
-use clap::{App, AppSettings, Arg, SubCommand};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use eui48::MacAddress;
 use pwlp::parser::parse;
 use pwlp::program::Program;
@@ -33,6 +33,63 @@ struct Config {
 struct DeviceConfig {
 	program: Option<String>,
 	secret: Option<String>,
+}
+
+fn vm_from_options(options: &ArgMatches) -> VM {
+	let length = options
+		.value_of("length")
+		.unwrap_or("10")
+		.parse::<u8>()
+		.unwrap();
+
+	let strip = strip::DummyStrip::new(length, true);
+	let mut vm = VM::new(Box::new(strip));
+	
+	#[cfg(feature = "raspberrypi")]
+	{
+		if options.is_present("hardware") {
+			let spi_bus = match options.value_of("bus") {
+				Some(bus_str) => match bus_str {
+					"0" => spi::Bus::Spi0,
+					"1" => spi::Bus::Spi1,
+					"2" => spi::Bus::Spi2,
+					_ => panic!("invalid SPI bus number (should be 0, 1 or 2)"),
+				},
+				None => spi::Bus::Spi0,
+			};
+
+			let ss = match options.value_of("ss") {
+				Some(ss_str) => match ss_str {
+					"0" => spi::SlaveSelect::Ss0,
+					"1" => spi::SlaveSelect::Ss1,
+					"2" => spi::SlaveSelect::Ss2,
+					_ => panic!("invalid SS number (should be 0, 1 or 2)"),
+				},
+				None => spi::SlaveSelect::Ss0,
+			};
+
+			let spi = spi::Spi::new(spi_bus, ss, 2_000_000, spi::Mode::Mode0)
+				.expect("spi bus could not be created");
+			let strip = strip::spi_strip::SPIStrip::new(spi, length);
+			vm = VM::new(Box::new(strip));
+		}
+	}
+
+	vm.set_trace(options.is_present("trace"));
+	vm.set_deterministic(options.is_present("deterministic"));
+	vm.set_instruction_limit(if options.is_present("instruction-limit") {
+		Some(
+			options
+				.value_of("instruction-limit")
+				.unwrap()
+				.parse::<u64>()
+				.expect("invalid limit number"),
+		)
+	} else {
+		None
+	});
+
+	vm
 }
 
 fn main() -> std::io::Result<()> {
@@ -116,6 +173,37 @@ fn main() -> std::io::Result<()> {
 				),
 		)
 		.subcommand(
+			SubCommand::with_name("client")
+				.about("run as client")
+				.arg(Arg::with_name("hardware")
+						.short("h")
+						.long("hardware")
+						.takes_value(false)
+						.help("output to actual hardware (if supported)"))
+				.arg(Arg::with_name("length")
+						.long("length")
+						.short("l")
+						.takes_value(true)
+						.value_name("10")
+						.help("length of the LED strip"))
+				.arg(Arg::with_name("bus")
+						.long("bus")
+						.takes_value(true)
+						.value_name("0")
+						.help("number of SPI bus to use"))
+				.arg(Arg::with_name("ss")
+						.long("ss")
+						.takes_value(true)
+						.value_name("0")
+						.help("the slave-select port to use for the SPI bus"))
+				.arg(Arg::with_name("trace")
+						.short("t")
+						.long("trace")
+						.takes_value(false)
+						.help("show instructions as they are executed")
+				),
+		)
+		.subcommand(
 			SubCommand::with_name("serve")
 				.about("start server")
 				.arg(
@@ -155,13 +243,11 @@ fn main() -> std::io::Result<()> {
 		.get_matches();
 
 	// Find out which subcommand to perform
-	if let Some(run_matches) = matches.subcommand_matches("run") {
+	if let Some(_client_matches) = matches.subcommand_matches("client") {
+		//// let vm = vm_from_options(&client_matches);
+		unimplemented!();
+	} else if let Some(run_matches) = matches.subcommand_matches("run") {
 		let interpret_as_binary = run_matches.is_present("binary");
-		let length = run_matches
-			.value_of("length")
-			.unwrap_or("10")
-			.parse::<u8>()
-			.unwrap();
 
 		let program = if interpret_as_binary {
 			let mut source = Vec::<u8>::new();
@@ -184,54 +270,8 @@ fn main() -> std::io::Result<()> {
 			}
 		};
 
-		let limit: Option<u64> = if run_matches.is_present("instruction-limit") {
-			Some(
-				run_matches
-					.value_of("instruction-limit")
-					.unwrap()
-					.parse::<u64>()
-					.expect("invalid limit number"),
-			)
-		} else {
-			None
-		};
-
-		let deterministic = run_matches.is_present("deterministic");
-
-		if cfg!(feature = "raspberrypi") && run_matches.is_present("hardware") {
-			#[cfg(feature = "raspberrypi")]
-			{
-				let spi_bus = match run_matches.value_of("bus") {
-					Some(bus_str) => match bus_str {
-						"0" => spi::Bus::Spi0,
-						"1" => spi::Bus::Spi1,
-						"2" => spi::Bus::Spi2,
-						_ => panic!("invalid SPI bus number (should be 0, 1 or 2)"),
-					},
-					None => spi::Bus::Spi0,
-				};
-
-				let ss = match run_matches.value_of("ss") {
-					Some(ss_str) => match ss_str {
-						"0" => spi::SlaveSelect::Ss0,
-						"1" => spi::SlaveSelect::Ss1,
-						"2" => spi::SlaveSelect::Ss2,
-						_ => panic!("invalid SS number (should be 0, 1 or 2)"),
-					},
-					None => spi::SlaveSelect::Ss0,
-				};
-
-				let spi = spi::Spi::new(spi_bus, ss, 2_000_000, spi::Mode::Mode0)
-					.expect("spi bus could not be created");
-				let strip = strip::spi_strip::SPIStrip::new(spi, length);
-				let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));
-				vm.run(&program, limit, deterministic);
-			}
-		} else {
-			let strip = strip::DummyStrip::new(length, true);
-			let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));
-			vm.run(&program, limit, deterministic);
-		}
+		let mut vm = vm_from_options(&run_matches);
+		vm.run(&program);
 	}
 	if let Some(matches) = matches.subcommand_matches("compile") {
 		let mut source = String::new();

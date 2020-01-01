@@ -8,16 +8,35 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub struct VM {
 	trace: bool,
 	strip: Box<dyn Strip>,
+	instruction_limit: Option<u64>,
+	deterministic: bool,
 }
 
 impl VM {
-	pub fn new(strip: Box<dyn Strip>, trace: bool) -> VM {
-		VM { trace, strip }
+	pub fn new(strip: Box<dyn Strip>) -> VM {
+		VM {
+			trace: false,
+			strip,
+			instruction_limit: None,
+			deterministic: false,
+		}
+	}
+
+	pub fn set_trace(&mut self, trace: bool) {
+		self.trace = trace
+	}
+
+	pub fn set_deterministic(&mut self, d: bool) {
+		self.deterministic = d
+	}
+
+	pub fn set_instruction_limit(&mut self, limit: Option<u64>) {
+		self.instruction_limit = limit
 	}
 
 	/** Run a program. Note, this is not deterministic (e.g. contains calls to current time, random number generation)
 	 * so not suitable to use in tests. */
-	pub fn run(&mut self, program: &Program, instructions_limit: Option<u64>, deterministic: bool) {
+	pub fn run(&mut self, program: &Program) {
 		let mut rng = rand::thread_rng();
 		let mut deterministic_rng = ChaCha20Rng::from_seed([0u8; 32]);
 		let mut pc = 0;
@@ -31,7 +50,7 @@ impl VM {
 
 		while pc < program.code.len() {
 			// Enforce instruction count limit
-			if let Some(limit) = instructions_limit {
+			if let Some(limit) = self.instruction_limit {
 				if instruction_count >= limit {
 					break;
 				}
@@ -209,7 +228,7 @@ impl VM {
 						0 => stack.push(self.strip.length() as u32),
 						1 => {
 							// GET_WALL_TIME
-							if deterministic {
+							if self.deterministic {
 								stack.push((instruction_count / 10) as u32);
 							} else {
 								let time = SystemTime::now()
@@ -221,7 +240,7 @@ impl VM {
 						}
 						2 => {
 							// GET_PRECISE_TIME
-							if deterministic {
+							if self.deterministic {
 								stack.push(instruction_count as u32);
 							} else {
 								let time = SystemTime::now()
@@ -251,7 +270,7 @@ impl VM {
 						5 => {
 							// RANDOM_INT
 							let v = stack.pop().unwrap();
-							if deterministic {
+							if self.deterministic {
 								stack.push(deterministic_rng.gen_range(0, v));
 							} else {
 								stack.push(rng.gen_range(0, v));
