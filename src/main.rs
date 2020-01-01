@@ -7,11 +7,12 @@ use pwlp::parser::parse;
 use pwlp::program::Program;
 use pwlp::server::{DeviceConfig, Server};
 use pwlp::strip;
-use pwlp::vm::VM;
+use pwlp::vm::{Outcome, VM};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{stdin, Read, Write};
+use std::time::{Duration, SystemTime};
 
 #[cfg(feature = "raspberrypi")]
 extern crate rppal;
@@ -141,6 +142,11 @@ fn main() -> std::io::Result<()> {
 						.takes_value(true)
 						.value_name("0")
 						.help("the maximum number of instructions to execute (default: 0 = no limit)"))
+				.arg(Arg::with_name("fps-limit")
+						.long("fps-limit")
+						.takes_value(true)
+						.value_name("0")
+						.help("the maximum number of frames per second to execute (default = no limit)"))
 				.arg(Arg::with_name("deterministic")
 						.long("deterministic")
 						.takes_value(false)
@@ -268,9 +274,44 @@ fn main() -> std::io::Result<()> {
 			None
 		};
 
+		let fps: Option<u64> = if run_matches.is_present("fps-limit") {
+			Some(
+				run_matches
+					.value_of("fps-limit")
+					.unwrap()
+					.parse::<u64>()
+					.expect("invalid FPS limit number"),
+			)
+		} else {
+			None
+		};
+
 		let mut vm = vm_from_options(&run_matches);
-		let mut state = vm.start(program);
-		state.run(instruction_limit);
+		let mut state = vm.start(program, instruction_limit);
+		let mut last_yield_time = SystemTime::now();
+		let frame_time = if let Some(fps) = fps {
+			Some(Duration::from_millis(1000 / fps))
+		} else {
+			None
+		};
+		let mut running = true;
+
+		while running {
+			match state.run() {
+				Outcome::Yielded => {
+					if let Some(frame_time) = frame_time {
+						let now = SystemTime::now();
+						let passed = now.duration_since(last_yield_time).unwrap();
+						if passed < frame_time {
+							// We have some time left in this frame, sit it out
+							std::thread::sleep(frame_time - passed);
+						}
+						last_yield_time = now;
+					}
+				}
+				Outcome::InstructionLimitReached | Outcome::Ended => running = false,
+			}
+		}
 	} else if let Some(matches) = matches.subcommand_matches("compile") {
 		let mut source = String::new();
 		if let Some(source_file) = matches.value_of("file") {

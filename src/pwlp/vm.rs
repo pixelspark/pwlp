@@ -3,52 +3,58 @@ use super::program::Program;
 use super::strip::Strip;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct State<'a> {
 	vm: &'a mut VM,
 	program: Program,
 	pc: usize,
-	stack: Vec<u32>
+	stack: Vec<u32>,
+	start_time: SystemTime,
+	instruction_count: usize,
+	instruction_limit: Option<usize>,
 }
 
 pub struct VM {
 	trace: bool,
 	strip: Box<dyn Strip>,
-	deterministic: bool
+	deterministic: bool,
+}
+
+pub enum Outcome {
+	Ended,
+	InstructionLimitReached,
+	Yielded,
 }
 
 impl<'a> State<'a> {
-	fn new(vm: &'a mut VM, program: Program) -> State<'a> {
+	fn new(vm: &'a mut VM, program: Program, instruction_limit: Option<usize>) -> State<'a> {
 		State {
 			vm,
 			program,
 			pc: 0,
-			stack: vec![]
+			stack: vec![],
+			start_time: SystemTime::now(),
+			instruction_limit,
+			instruction_count: 0,
 		}
 	}
 
-	pub fn run(&mut self, instruction_limit: Option<usize>) {
+	pub fn run(&mut self) -> Outcome {
 		let mut rng = rand::thread_rng();
 		let mut deterministic_rng = ChaCha20Rng::from_seed([0u8; 32]);
-		let start_time = SystemTime::now();
-		let fps = 60;
-		let frame_time = Duration::from_millis(1000 / fps);
-		let mut last_yield_time = SystemTime::now();
-
-		let mut instruction_count = 0;
 
 		while self.pc < self.program.code.len() {
 			// Enforce instruction count limit
-			if let Some(limit) = instruction_limit {
-				if instruction_count >= limit {
-					break;
+			if let Some(limit) = self.instruction_limit {
+				if self.instruction_count >= limit {
+					return Outcome::InstructionLimitReached;
 				}
 			}
 
 			let ins = Prefix::from(self.program.code[self.pc]);
 			if let Some(i) = ins {
-				instruction_count += 1;
+				self.instruction_count += 1;
 				let postfix = self.program.code[self.pc] & 0x0F;
 
 				if self.vm.trace {
@@ -219,7 +225,7 @@ impl<'a> State<'a> {
 						1 => {
 							// GET_WALL_TIME
 							if self.vm.deterministic {
-								self.stack.push((instruction_count / 10) as u32);
+								self.stack.push((self.instruction_count / 10) as u32);
 							} else {
 								let time = SystemTime::now()
 									.duration_since(UNIX_EPOCH)
@@ -231,10 +237,10 @@ impl<'a> State<'a> {
 						2 => {
 							// GET_PRECISE_TIME
 							if self.vm.deterministic {
-								self.stack.push(instruction_count as u32);
+								self.stack.push(self.instruction_count as u32);
 							} else {
 								let time = SystemTime::now()
-									.duration_since(start_time)
+									.duration_since(self.start_time)
 									.unwrap()
 									.as_millis();
 								self.stack.push((time & std::u32::MAX as u128) as u32); // Wrap around when we exceed u32::MAX
@@ -296,29 +302,8 @@ impl<'a> State<'a> {
 								println!("DUMP: {:?}", self.stack);
 							}
 							14 => {
-								// YIELD
-								let now = SystemTime::now();
-								let passed = now.duration_since(last_yield_time).unwrap();
-								if passed < frame_time {
-									if self.vm.trace {
-										print!(
-											"\t{}ms passed, {}ms frame time, {}ms left to wait",
-											passed.as_millis(),
-											frame_time.as_millis(),
-											(frame_time - passed).as_millis()
-										);
-									}
-									// We have some time left
-									std::thread::sleep(frame_time - passed);
-								} else if self.vm.trace {
-									print!(
-										"{}ms passed, {}ms frame time, no time left to wait",
-										passed.as_millis(),
-										frame_time.as_millis()
-									);
-								}
-
-								last_yield_time = now;
+								self.pc += 1;
+								return Outcome::Yielded;
 							}
 							15 => {
 								// TWOBYTE
@@ -357,8 +342,10 @@ impl<'a> State<'a> {
 		}
 
 		if self.vm.trace {
-			println!("Ended; {} instructions executed", instruction_count);
+			println!("Ended; {} instructions executed", self.instruction_count);
 		}
+
+		Outcome::Ended
 	}
 }
 
@@ -367,7 +354,7 @@ impl VM {
 		VM {
 			trace: false,
 			strip,
-			deterministic: false
+			deterministic: false,
 		}
 	}
 
@@ -379,7 +366,7 @@ impl VM {
 		self.deterministic = d
 	}
 
-	pub fn start(&mut self, program: Program) -> State {
-		State::new(self, program)
+	pub fn start(&mut self, program: Program, instruction_limit: Option<usize>) -> State {
+		State::new(self, program, instruction_limit)
 	}
 }
