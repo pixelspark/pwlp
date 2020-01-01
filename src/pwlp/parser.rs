@@ -274,6 +274,98 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 		map(tag("get_precise_time"), |_| {
 			Expression::User(instructions::UserCommand::GET_PRECISE_TIME)
 		}),
+		/* Compiler intrinsics: 'functions' that simply compile to an expression  */
+		map(
+			tuple((
+				tag("irgb("),
+				preceded(sp, terminated(expression, sp)),
+				tag(","),
+				preceded(sp, terminated(expression, sp)),
+				tag(","),
+				preceded(sp, terminated(expression, sp)),
+				tag(","),
+				preceded(sp, terminated(expression, sp)),
+				tag(")"),
+			)),
+			|t| {
+				// (i & 0xFF) | (r & 0xFF) << 8 | (g & 0xFF) << 16 | (b & 0xFF) << 24
+				let vals = vec![t.3, t.5, t.7];
+				let mut shift: u32 = 8;
+				let mut root: Box<Expression> = Box::new(Expression::Binary(
+					Box::new(t.1),
+					instructions::Binary::AND,
+					Box::new(Expression::Literal(0xFF))
+				));
+
+				for val in vals {
+					root = Box::new(Expression::Binary(
+						root,
+						instructions::Binary::OR,
+						Box::new(Expression::Binary(
+							Box::new(Expression::Binary(
+								Box::new(val),
+								instructions::Binary::AND,
+								Box::new(Expression::Literal(0xFF))
+							)),
+							instructions::Binary::SHL,
+							Box::new(Expression::Literal(shift))
+						))
+					));
+					shift += 8;
+				}
+				*root
+			},
+		),
+		map(tuple((tag("index("), expression, tag(")"))), |t| {
+			// x & 0xFF
+			Expression::Binary(
+				Box::new(t.1),
+				instructions::Binary::AND, 
+				Box::new(Expression::Literal(0xFF))
+			)
+		}),
+		map(tuple((tag("red("), expression, tag(")"))), |t| {
+			// (x >> 8) & 0xFF
+			Expression::Binary(
+				Box::new(Expression::Unary(
+					instructions::Unary::SHR8,
+					Box::new(t.1)
+				)),
+				instructions::Binary::AND, 
+				Box::new(Expression::Literal(0xFF))
+			)
+		}),
+		map(tuple((tag("green("), expression, tag(")"))), |t| {
+			// (x >> 16) & 0xFF
+			Expression::Binary(
+				Box::new(Expression::Unary(
+					instructions::Unary::SHR8,
+					Box::new(Expression::Unary(
+						instructions::Unary::SHR8,
+						Box::new(t.1)
+					))
+				)),
+				instructions::Binary::AND, 
+				Box::new(Expression::Literal(0xFF))
+			)
+		}),
+		map(tuple((tag("blue("), expression, tag(")"))), |t| {
+			// (x >> 24) & 0xFF
+			Expression::Binary(
+				Box::new(Expression::Unary(
+					instructions::Unary::SHR8,
+					Box::new(Expression::Unary(
+						instructions::Unary::SHR8,
+						Box::new(Expression::Unary(
+							instructions::Unary::SHR8,
+							Box::new(t.1)
+						))
+					))
+				)),
+				instructions::Binary::AND, 
+				Box::new(Expression::Literal(0xFF))
+			)
+		}),
 	))(input)
 }
 

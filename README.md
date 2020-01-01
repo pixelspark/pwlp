@@ -61,6 +61,12 @@ Consecutive statements are separated by ";". Supported constructs:
   * `get_length`: the length of the strip
   * `get_precise_time`
   * `get_wall_time`
+* Compiler intrinsics:
+  * `irgb(i, r, g, b)` translates to `(i & 0xFF) | (r & 0xFF) << 8 | (g & 0xFF) << 16 | (b & 0xFF) << 24`
+  * `red(c)` translates to `(c >> 8) & 0xFF`
+  * `green(c)` translates to `(c >> 16) & 0xFF`
+  * `blue(c)` translates to `(c >> 24) & 0xFF`
+  * `index(c)` translates to `c & 0xFF`
 
 ### Expressions
 
