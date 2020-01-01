@@ -16,6 +16,7 @@ serde = { version = "1.0", features = ["derive"] }
 nom = "5.0.1"
 rand = "0.7.2"
 rppal = { version = "0.11.3", optional = true }
+rand_chacha = "0.2.1"
 
 [features]
 raspberrypi = ["rppal"]

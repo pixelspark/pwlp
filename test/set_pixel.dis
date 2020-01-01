@@ -1,4 +1,5 @@
-0000.	31	PUSHI	[ff, cc, 00, 00]
+0000.	31	PUSHI	[05, cc, 00, 00]
 0005.	e3	USER	set_pixel
 0006.	01	POP	1
+0007.	e4	USER	blit
 

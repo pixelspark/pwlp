@@ -3,3 +3,4 @@ for(n=get_length) {
 	r = (p & 0xFF00) >> 8;
 	set_pixel(n-1, clamp(r,1,255)-1, 0, 0);
 };
+blit;

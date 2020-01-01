@@ -99,6 +99,15 @@ fn main() -> std::io::Result<()> {
 						.takes_value(true)
 						.value_name("0")
 						.help("the slave-select port to use for the SPI bus"))
+				.arg(Arg::with_name("instruction-limit")
+						.long("instruction-limit")
+						.takes_value(true)
+						.value_name("0")
+						.help("the maximum number of instructions to execute (default: 0 = no limit)"))
+				.arg(Arg::with_name("deterministic")
+						.long("deterministic")
+						.takes_value(false)
+						.help("make output of non-deterministic functions (time, randomness) deterministic (For testing purposes)"))
 				.arg(Arg::with_name("trace")
 						.short("t")
 						.long("trace")
@@ -175,6 +184,15 @@ fn main() -> std::io::Result<()> {
 			}
 		};
 
+		let limit: Option<u64> = if run_matches.is_present("instruction-limit") {
+			Some(run_matches.value_of("instruction-limit").unwrap().parse::<u64>().expect("invalid limit number"))
+		}
+		else {
+			None
+		};
+
+		let deterministic = run_matches.is_present("deterministic");
+
 		if cfg!(feature = "raspberrypi") && run_matches.is_present("hardware") {
 			#[cfg(feature = "raspberrypi")]
 			{
@@ -202,12 +220,12 @@ fn main() -> std::io::Result<()> {
 					.expect("spi bus could not be created");
 				let strip = strip::spi_strip::SPIStrip::new(spi, length);
 				let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));
-				vm.run(&program);
+				vm.run(&program, limit, deterministic);
 			}
 		} else {
 			let strip = strip::DummyStrip::new(length, true);
 			let mut vm = VM::new(Box::new(strip), run_matches.is_present("trace"));
-			vm.run(&program);
+			vm.run(&program, limit, deterministic);
 		}
 	}
 	if let Some(matches) = matches.subcommand_matches("compile") {

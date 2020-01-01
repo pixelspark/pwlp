@@ -1,7 +1,8 @@
 use super::instructions::{Binary, Prefix, Unary};
 use super::program::Program;
 use super::strip::Strip;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub struct VM {
@@ -16,8 +17,9 @@ impl VM {
 
 	/** Run a program. Note, this is not deterministic (e.g. contains calls to current time, random number generation)
 	 * so not suitable to use in tests. */
-	pub fn run(&mut self, program: &Program) {
+	pub fn run(&mut self, program: &Program, instructions_limit: Option<u64>, deterministic: bool) {
 		let mut rng = rand::thread_rng();
+		let mut deterministic_rng = ChaCha20Rng::from_seed([0u8; 32]);
 		let mut pc = 0;
 		let mut stack: Vec<u32> = vec![];
 		let start_time = SystemTime::now();
@@ -25,9 +27,16 @@ impl VM {
 		let frame_time = Duration::from_millis(1000 / fps);
 		let mut last_yield_time = SystemTime::now();
 
-		let mut instruction_count = 0;
+		let mut instruction_count = 0u64;
 
 		while pc < program.code.len() {
+			// Enforce instruction count limit
+			if let Some(limit) = instructions_limit {
+				if instruction_count >= limit {
+					break;
+				}
+			}
+
 			let ins = Prefix::from(program.code[pc]);
 			if let Some(i) = ins {
 				instruction_count += 1;
@@ -200,19 +209,29 @@ impl VM {
 						0 => stack.push(self.strip.length() as u32),
 						1 => {
 							// GET_WALL_TIME
-							let time = SystemTime::now()
-								.duration_since(UNIX_EPOCH)
-								.unwrap()
-								.as_secs();
-							stack.push((time & std::u32::MAX as u64) as u32); // Wrap around when we exceed u32::MAX
+							if deterministic {
+								stack.push((instruction_count / 10) as u32);
+							}
+							else {
+								let time = SystemTime::now()
+									.duration_since(UNIX_EPOCH)
+									.unwrap()
+									.as_secs();
+								stack.push((time & std::u32::MAX as u64) as u32); // Wrap around when we exceed u32::MAX
+							}
 						}
 						2 => {
 							// GET_PRECISE_TIME
-							let time = SystemTime::now()
-								.duration_since(start_time)
-								.unwrap()
-								.as_millis();
-							stack.push((time & std::u32::MAX as u128) as u32); // Wrap around when we exceed u32::MAX
+							if deterministic {
+								stack.push(instruction_count as u32);
+							}
+							else {
+								let time = SystemTime::now()
+									.duration_since(start_time)
+									.unwrap()
+									.as_millis();
+								stack.push((time & std::u32::MAX as u128) as u32); // Wrap around when we exceed u32::MAX
+							}
 						}
 						3 => {
 							let v = stack.last().unwrap();
@@ -234,7 +253,12 @@ impl VM {
 						5 => {
 							// RANDOM_INT
 							let v = stack.pop().unwrap();
-							stack.push(rng.gen_range(0, v));
+							if deterministic {
+								stack.push(deterministic_rng.gen_range(0, v));
+							}
+							else {
+								stack.push(rng.gen_range(0, v));
+							}
 						}
 						6 => {
 							// GET_PIXEL

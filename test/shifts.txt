@@ -5,3 +5,5 @@ d=a<<8;
 e=a>>1;
 f=a>>4;
 g=a>>8;
+set_pixel(a-1, b, c, d);
+blit;
