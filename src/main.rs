@@ -378,7 +378,7 @@ fn main() -> std::io::Result<()> {
 		let mut running = true;
 
 		while running {
-			match state.run() {
+			match state.run(None) {
 				Outcome::Yielded => {
 					if let Some(frame_time) = frame_time {
 						let now = SystemTime::now();
@@ -390,7 +390,7 @@ fn main() -> std::io::Result<()> {
 						last_yield_time = now;
 					}
 				}
-				Outcome::InstructionLimitReached | Outcome::Ended => running = false,
+				Outcome::GlobalInstructionLimitReached | Outcome::LocalInstructionLimitReached | Outcome::Ended => running = false,
 				Outcome::Error(e) => {
 					println!("Error in VM at pc={}: {:?}", state.pc(), e);
 				}

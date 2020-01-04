@@ -141,8 +141,10 @@ impl Client {
 			};
 			let mut running = true;
 
+			let instruction_limit_per_cycle = 1000;
+
 			while running {
-				let outcome = state.run();
+				let outcome = state.run(Some(instruction_limit_per_cycle));
 
 				// See if there is a new program waiting
 				if let Ok(p) = rx.try_recv() {
@@ -152,6 +154,9 @@ impl Client {
 				// Go into next iteration and start new program
 				} else {
 					match outcome {
+						Outcome::LocalInstructionLimitReached => {
+							// Just continue on a new cycle
+						},
 						Outcome::Yielded => {
 							if let Some(frame_time) = frame_time {
 								let now = SystemTime::now();
@@ -163,7 +168,7 @@ impl Client {
 								last_yield_time = now;
 							}
 						}
-						Outcome::InstructionLimitReached | Outcome::Ended => {
+						Outcome::GlobalInstructionLimitReached | Outcome::Ended => {
 							// Await a new program
 							program = Some(rx.recv().unwrap());
 							running = false;

@@ -32,7 +32,8 @@ pub enum VMError {
 
 pub enum Outcome {
 	Ended,
-	InstructionLimitReached,
+	GlobalInstructionLimitReached,
+	LocalInstructionLimitReached,
 	Yielded,
 	Error(VMError),
 }
@@ -55,18 +56,27 @@ impl<'a> State<'a> {
 		self.pc
 	}
 
-	pub fn run(&mut self) -> Outcome {
+	pub fn run(&mut self, local_instruction_limit: Option<usize>) -> Outcome {
+		let mut local_instruction_count = 0;
 		while self.pc < self.program.code.len() {
-			// Enforce instruction count limit
+			// Enforce global instruction count limit
 			if let Some(limit) = self.instruction_limit {
 				if self.instruction_count >= limit {
-					return Outcome::InstructionLimitReached;
+					return Outcome::GlobalInstructionLimitReached;
+				}
+			}
+
+			// Enforce local instruction count limit
+			if let Some(limit) = local_instruction_limit {
+				if local_instruction_count >= limit {
+					return Outcome::LocalInstructionLimitReached;
 				}
 			}
 
 			let ins = Prefix::from(self.program.code[self.pc]);
 			if let Some(i) = ins {
 				self.instruction_count += 1;
+				local_instruction_count += 1;
 				let postfix = self.program.code[self.pc] & 0x0F;
 
 				if self.vm.trace {
