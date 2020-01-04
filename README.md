@@ -39,6 +39,9 @@ cat test/random.txt | cargo run -- run
 # Serve programs to devices (configure using config.toml)
 cargo run -- serve
 
+# Run a client (configure using config.toml)
+cargo run -- client
+
 # Run a program
 cargo run -- run --binary test/clock.bin
 

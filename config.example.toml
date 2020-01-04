@@ -1,9 +1,16 @@
+[server]
 secret = "Secret"
 program = "test/random.bin"
+# bind_address = "0.0.0.0:33333"
 
-[devices.18-fe-34-f5-c1-79]
+[server.devices.18-fe-34-f5-c1-79]
 secret = "Secret2"
 program = "test/set_all.bin"
 
-[devices.5c-cf-7f-0b-33-d5]
+[server.devices.5c-cf-7f-0b-33-d5]
 # Will use global secret
+
+[client]
+secret = "Secret"
+# bind_address = "0.0.0.0:33332"
+# server_address = "0.0.0.0:33333"
