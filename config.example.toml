@@ -12,5 +12,6 @@ program = "test/set_all.bin"
 
 [client]
 secret = "Secret"
+# fps_limit = 60
 # bind_address = "0.0.0.0:33332"
 # server_address = "0.0.0.0:33333"

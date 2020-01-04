@@ -24,10 +24,17 @@ pub struct VM {
 	deterministic: bool,
 }
 
+#[derive(Debug)]
+pub enum VMError {
+	UnknownInstruction,
+	StackUnderflow,
+}
+
 pub enum Outcome {
 	Ended,
 	InstructionLimitReached,
 	Yielded,
+	Error(VMError)
 }
 
 impl<'a> State<'a> {
@@ -43,6 +50,10 @@ impl<'a> State<'a> {
 			deterministic_rng: ChaCha20Rng::from_seed([0u8; 32]),
 			rng: rand::thread_rng()
 		}
+	}
+
+	pub fn pc(&self) -> usize {
+		self.pc
 	}
 
 	pub fn run(&mut self) -> Outcome {
@@ -116,6 +127,9 @@ impl<'a> State<'a> {
 						self.pc = match i {
 							Prefix::JMP => target,
 							Prefix::JZ => {
+								if self.stack.len() < 1 {
+									return Outcome::Error(VMError::StackUnderflow);
+								}
 								let head = self.stack.last().unwrap();
 								if *head == 0 {
 									target
@@ -124,6 +138,9 @@ impl<'a> State<'a> {
 								}
 							}
 							Prefix::JNZ => {
+								if self.stack.len() < 1 {
+									return Outcome::Error(VMError::StackUnderflow);
+								}
 								let head = self.stack.last().unwrap();
 								if *head != 0 {
 									target
@@ -131,7 +148,7 @@ impl<'a> State<'a> {
 									self.pc + 3
 								}
 							}
-							_ => unreachable!(),
+							_ => return Outcome::Error(VMError::UnknownInstruction)
 						};
 
 						if self.vm.trace {
@@ -141,6 +158,9 @@ impl<'a> State<'a> {
 					}
 					Prefix::BINARY => {
 						if let Some(op) = Binary::from(postfix) {
+							if self.stack.len() < 2 {
+								return Outcome::Error(VMError::StackUnderflow);
+							}
 							let rhs = self.stack.pop().unwrap();
 							let lhs = self.stack.pop().unwrap();
 							self.stack.push(match op {
@@ -206,6 +226,9 @@ impl<'a> State<'a> {
 					}
 					Prefix::UNARY => {
 						if let Some(op) = Unary::from(postfix) {
+							if self.stack.len() < 1 {
+								return Outcome::Error(VMError::StackUnderflow);
+							}
 							let lhs = self.stack.pop().unwrap();
 							self.stack.push(match op {
 								Unary::DEC => lhs - 1,
@@ -249,6 +272,9 @@ impl<'a> State<'a> {
 							}
 						}
 						3 => {
+							if self.stack.len() < 1 {
+								return Outcome::Error(VMError::StackUnderflow);
+							}
 							let v = self.stack.last().unwrap();
 							let idx = (v & 0xFF) as u8;
 							let r = (((v >> 8) as u32) & 0xFF) as u8;
@@ -267,6 +293,9 @@ impl<'a> State<'a> {
 						}
 						5 => {
 							// RANDOM_INT
+							if self.stack.len() < 1 {
+								return Outcome::Error(VMError::StackUnderflow);
+							}
 							let v = self.stack.pop().unwrap();
 							if self.vm.deterministic {
 								self.stack.push(self.deterministic_rng.gen_range(0, v));
@@ -276,6 +305,9 @@ impl<'a> State<'a> {
 						}
 						6 => {
 							// GET_PIXEL
+							if self.stack.len() < 1 {
+								return Outcome::Error(VMError::StackUnderflow);
+							}
 							let v = self.stack.pop().unwrap();
 							let color = self.vm.strip.get_pixel((v & 0xFF) as u8);
 							let color_value = (v & 0xFF)
@@ -287,13 +319,16 @@ impl<'a> State<'a> {
 							if self.vm.trace {
 								print!("\t(unknown user function)");
 							}
-							break;
+							return Outcome::Error(VMError::UnknownInstruction);
 						}
 					},
 					Prefix::SPECIAL => {
 						match postfix {
 							12 => {
 								// SWAP
+								if self.stack.len() < 2 {
+									return Outcome::Error(VMError::StackUnderflow);
+								}
 								let lhs = self.stack.pop().unwrap();
 								let rhs = self.stack.pop().unwrap();
 								self.stack.push(lhs);
@@ -309,9 +344,9 @@ impl<'a> State<'a> {
 							}
 							15 => {
 								// TWOBYTE
-								panic!("Two-byte instructions not implemented nor valid");
+								return Outcome::Error(VMError::UnknownInstruction);
 							}
-							_ => unimplemented!(),
+							_ => return Outcome::Error(VMError::UnknownInstruction)
 						}
 
 						if self.vm.trace {
@@ -320,7 +355,7 @@ impl<'a> State<'a> {
 								13 => "dump",
 								14 => "yield",
 								15 => "twobyte",
-								_ => unimplemented!(),
+								_ => return Outcome::Error(VMError::UnknownInstruction)
 							};
 
 							print!("\t{}", name);

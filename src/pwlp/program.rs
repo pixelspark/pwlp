@@ -334,26 +334,45 @@ impl fmt::Debug for Program {
 				write!(f, "{:04}.\t{:02x}\t{}", pc, self.code[pc], i)?;
 				match i {
 					Prefix::PUSHI => {
-						write!(
-							f,
-							"\t{:02x?}",
-							&self.code[(pc + 1)..(pc + 1 + (postfix as usize) * 4)]
-						)?;
-						pc += (postfix as usize) * 4;
+						let end = (postfix as usize) *4 + pc + 1;
+						if end > self.code.len() {
+							write!(f, "\t(invalid, overruns code; size={})", (postfix as usize))?;
+							return Ok(());
+						}
+						else {
+							write!(
+								f,
+								"\t{:02x?}",
+								&self.code[(pc + 1)..(pc + 1 + (postfix as usize) * 4)]
+							)?;
+							pc += (postfix as usize) * 4;
+						}
 					}
 					Prefix::PUSHB => {
 						if postfix == 0 {
 							write!(f, "\t0")?;
-						} else {
-							write!(
-								f,
-								"\t{:02x?}",
-								&self.code[(pc + 1)..(pc + 1 + (postfix as usize))]
-							)?;
-							pc += postfix as usize;
+						} 
+						else {
+							let end = (postfix as usize) + pc + 1;
+							if end > self.code.len() {
+								write!(f, "\t(invalid, overruns code; size={})", (postfix as usize))?;
+								return Ok(());
+							}
+							else {
+								write!(
+									f,
+									"\t{:02x?}",
+									&self.code[(pc + 1)..(pc + 1 + (postfix as usize))]
+								)?;
+								pc += postfix as usize;
+							}
 						}
 					}
 					Prefix::JMP | Prefix::JZ | Prefix::JNZ => {
+						if self.code.len() < (pc + 1) {
+							write!(f, "\t(invalid, overruns code)")?;
+							return Ok(());
+						}
 						let target =
 							u32::from(self.code[pc + 1]) | u32::from(self.code[pc + 2]) << 8;
 						write!(f, "\tto {}", target)?;

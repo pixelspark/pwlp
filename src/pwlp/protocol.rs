@@ -102,7 +102,8 @@ impl Message {
 		let mac_address = Message::peek_mac_address(buffer)?;
 		let type_number = buffer[(MAC_SIZE + TIME_SIZE)];
 
-		let payload_size = data_size - MAC_SIZE - TIME_SIZE;
+		let payload_offset = MAC_SIZE + TIME_SIZE + MESSAGE_TYPE_SIZE;
+		let payload_size = data_size - MAC_SIZE - TIME_SIZE - MESSAGE_TYPE_SIZE;
 
 		Ok(Message {
 			mac_address,
@@ -112,7 +113,7 @@ impl Message {
 			message_type: MessageType::from(type_number),
 			payload: match payload_size {
 				0 => None,
-				_ => Some(buffer[(buffer.len() - payload_size)..buffer.len()].to_vec()),
+				_ => Some(buffer[payload_offset..(payload_offset + payload_size)].to_vec()),
 			},
 		})
 	}

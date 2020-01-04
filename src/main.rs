@@ -32,6 +32,7 @@ struct ClientConfig {
 	bind_address: Option<String>,
 	server_address: Option<String>,
 	secret: Option<String>,
+	fps_limit: Option<usize>
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -219,7 +220,12 @@ fn main() -> std::io::Result<()> {
 						.short("t")
 						.long("trace")
 						.takes_value(false)
-						.help("show instructions as they are executed")
+						.help("show instructions as they are executed"))
+				.arg(Arg::with_name("fps-limit")
+						.long("fps-limit")
+						.takes_value(true)
+						.value_name("60")
+						.help("the maximum number of frames per second to execute (default = 60, 0 indicates no limit)")
 				),
 		)
 		.subcommand(
@@ -272,6 +278,7 @@ fn main() -> std::io::Result<()> {
 		let mut bind_address: String = String::from("0.0.0.0:33332");
 		let mut secret: String = String::from("secret");
 		let mut server_address: String = String::from("0.0.0.0:33333");
+		let mut fps_limit = Some(60);
 
 		// Read configured values
 		if let Some(client_config) = config.client {
@@ -284,21 +291,31 @@ fn main() -> std::io::Result<()> {
 			if let Some(v) = client_config.secret {
 				secret = v.to_string();
 			}
+			if let Some(v) = client_config.fps_limit {
+				fps_limit = Some(v);
+			}
 		}
 
 		// Read arguments
-		if let Some(v) = matches.value_of("bind") {
+		if let Some(v) = client_matches.value_of("bind") {
 			bind_address = v.to_string();
 		}
-		if let Some(v) = matches.value_of("server") {
+		if let Some(v) = client_matches.value_of("server") {
 			server_address = v.to_string();
 		}
-		if let Some(v) = matches.value_of("secret") {
+		if let Some(v) = client_matches.value_of("secret") {
 			secret = v.to_string();
+		}
+		if let Some(v) = client_matches.value_of("fps-limit") {
+			fps_limit = Some(v.parse().unwrap());
+		}
+
+		if fps_limit == Some(0) {
+			fps_limit = None;
 		}
 
 		let vm = vm_from_options(&client_matches);
-		let mut client = Client::new(vm, &secret.as_bytes());
+		let mut client = Client::new(vm, &secret.as_bytes(), fps_limit);
 		client.run(&bind_address, &server_address).expect("running the client failed");
 	} else if let Some(run_matches) = matches.subcommand_matches("run") {
 		let interpret_as_binary = run_matches.is_present("binary");
@@ -372,6 +389,9 @@ fn main() -> std::io::Result<()> {
 					}
 				}
 				Outcome::InstructionLimitReached | Outcome::Ended => running = false,
+				Outcome::Error(e) => {
+					println!("Error in VM at pc={}: {:?}", state.pc(), e);
+				}
 			}
 		}
 	} else if let Some(matches) = matches.subcommand_matches("compile") {
