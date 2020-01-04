@@ -8,6 +8,7 @@ use pwlp::program::Program;
 use pwlp::server::{DeviceConfig, Server};
 use pwlp::strip;
 use pwlp::vm::{Outcome, VM};
+use pwlp::client::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
@@ -22,10 +23,24 @@ use rppal::spi;
 
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
+	client: Option<ClientConfig>,
+	server: Option<ServerConfig>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct ClientConfig {
 	bind_address: Option<String>,
+	server_address: Option<String>,
+	secret: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct ServerConfig {
+	bind_address: Option<String>,
+	server_address: Option<String>,
 	secret: Option<String>,
 	program: Option<String>,
-	devices: Option<HashMap<String, DeviceConfig>>,
+	devices: Option<HashMap<String, DeviceConfig>>
 }
 
 fn vm_from_options(options: &ArgMatches) -> VM {
@@ -166,6 +181,24 @@ fn main() -> std::io::Result<()> {
 						.long("hardware")
 						.takes_value(false)
 						.help("output to actual hardware (if supported)"))
+				.arg(
+					Arg::with_name("bind")
+						.short("b")
+						.long("bind")
+						.value_name("0.0.0.0:33332")
+						.help("Address the client should listen at (overrides default key set in config)")
+						.takes_value(true),
+				)
+				.arg(Arg::with_name("secret")
+						.long("secret")
+						.takes_value(true)
+						.value_name("secret")
+						.help("secret key used to sign communications with the server"))
+				.arg(Arg::with_name("server")
+						.long("server")
+						.takes_value(true)
+						.value_name("0.0.0.0:33333")
+						.help("address of the server"))
 				.arg(Arg::with_name("length")
 						.long("length")
 						.short("l")
@@ -235,9 +268,38 @@ fn main() -> std::io::Result<()> {
 	let config: Config = toml::from_str(&config_string)?;
 
 	// Find out which subcommand to perform
-	if let Some(_client_matches) = matches.subcommand_matches("client") {
-		//// let vm = vm_from_options(&client_matches);
-		unimplemented!();
+	if let Some(client_matches) = matches.subcommand_matches("client") {
+		let mut bind_address: String = String::from("0.0.0.0:33332");
+		let mut secret: String = String::from("secret");
+		let mut server_address: String = String::from("0.0.0.0:33333");
+
+		// Read configured values
+		if let Some(client_config) = config.client {
+			if let Some(v) = client_config.bind_address {
+				bind_address = v.to_string();
+			}
+			if let Some(v) = client_config.server_address {
+				server_address = v.to_string();
+			}
+			if let Some(v) = client_config.secret {
+				secret = v.to_string();
+			}
+		}
+
+		// Read arguments
+		if let Some(v) = matches.value_of("bind") {
+			bind_address = v.to_string();
+		}
+		if let Some(v) = matches.value_of("server") {
+			server_address = v.to_string();
+		}
+		if let Some(v) = matches.value_of("secret") {
+			secret = v.to_string();
+		}
+
+		let vm = vm_from_options(&client_matches);
+		let mut client = Client::new(vm, &secret.as_bytes());
+		client.run(&bind_address, &server_address).expect("running the client failed");
 	} else if let Some(run_matches) = matches.subcommand_matches("run") {
 		let interpret_as_binary = run_matches.is_present("binary");
 
@@ -342,30 +404,44 @@ fn main() -> std::io::Result<()> {
 		let program = Program::from_binary(source);
 		println!("{:?}", program);
 	} else if let Some(matches) = matches.subcommand_matches("serve") {
-		let global_secret = config
-			.secret
-			.unwrap_or_else(|| String::from(matches.value_of("bind").unwrap_or("secret")));
+		let mut global_secret = String::from("secret");
+		let mut default_program_path: Option<String> = None;
+		let mut bind_address = String::from("0.0.0.0:33333");
+		let mut devices: Option<HashMap<String, DeviceConfig>> = None;
 
-		let default_program = match matches.value_of("program") {
+		// Read configured values
+		if let Some(server_config) = config.server {
+			if let Some(v) = server_config.secret {
+				global_secret = v.to_string();
+			}
+
+			if let Some(v) = server_config.program {
+				default_program_path = Some(v.to_string());
+			}
+
+			if let Some(v) = server_config.bind_address {
+				bind_address = v.to_string();
+			}
+			devices = server_config.devices;
+		}
+
+		// Read arguments
+		if let Some(v) = matches.value_of("program") {
+			default_program_path = Some(v.to_string());
+		}
+		if let Some(v) = matches.value_of("bind") {
+			bind_address = v.to_string();
+		}
+
+		let default_program = match default_program_path {
 			Some(path) => Program::from_file(&path).expect("error reading specified program file"),
-			None => match config.program {
-				Some(path) => {
-					Program::from_file(&path).expect("program specified in config not found")
-				}
-				None => default_serve_program(),
-			},
+			None => default_serve_program()
 		};
 
 		// Start server
-		// Figure out bind address and open socket
-		let config_bind_address = config
-			.bind_address
-			.unwrap_or_else(|| String::from("0.0.0.0:33333"));
-		let bind_address = matches.value_of("bind").unwrap_or(&config_bind_address);
-
-		let mut server = Server::new(config.devices, &global_secret, default_program);
+		let mut server = Server::new(devices, &global_secret, default_program);
 		println!("PWLP server listening at {}", bind_address);
-		server.run(bind_address)?;
+		server.run(&bind_address)?;
 	};
 	Ok(())
 }
@@ -404,3 +480,4 @@ fn default_serve_program() -> Program {
 		});
 	program
 }
+

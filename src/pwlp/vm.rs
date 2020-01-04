@@ -351,13 +351,17 @@ impl<'a> State<'a> {
 	}
 }
 
-impl VM {
+impl<'a> VM {
 	pub fn new(strip: Box<dyn Strip>) -> VM {
 		VM {
 			trace: false,
 			strip,
 			deterministic: false,
 		}
+	}
+
+	pub fn strip(&'a mut self) -> &'a mut Box<dyn Strip> {
+		&mut self.strip
 	}
 
 	pub fn set_trace(&mut self, trace: bool) {

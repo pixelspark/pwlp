@@ -42,7 +42,15 @@ impl Server {
 				Ok(mac) => {
 					// Do we have a config for this mac?
 					let device_config: Option<&DeviceConfig> = match &self.devices {
-						Some(devices) => Some(&devices[&mac.to_canonical()]),
+						Some(devices) => {
+							let canonical_mac = mac.to_canonical();
+							if devices.contains_key(&canonical_mac) {
+								Some(&devices[&canonical_mac])
+							}
+							else {
+								None
+							}
+						},
 						None => None,
 					};
 
