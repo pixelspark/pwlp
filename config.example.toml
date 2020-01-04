@@ -14,4 +14,4 @@ program = "test/set_all.bin"
 secret = "Secret"
 # fps_limit = 60
 # bind_address = "0.0.0.0:33332"
-# server_address = "0.0.0.0:33333"
+# server_address = "224.0.0.1:33333" # any server in local network

@@ -277,7 +277,7 @@ fn main() -> std::io::Result<()> {
 	if let Some(client_matches) = matches.subcommand_matches("client") {
 		let mut bind_address: String = String::from("0.0.0.0:33332");
 		let mut secret: String = String::from("secret");
-		let mut server_address: String = String::from("0.0.0.0:33333");
+		let mut server_address: String = String::from("224.0.0.1:33333");
 		let mut fps_limit = Some(60);
 
 		// Read configured values
