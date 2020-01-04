@@ -3,12 +3,12 @@ mod test;
 extern crate clap;
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use pwlp::client::Client;
 use pwlp::parser::parse;
 use pwlp::program::Program;
 use pwlp::server::{DeviceConfig, Server};
 use pwlp::strip;
 use pwlp::vm::{Outcome, VM};
-use pwlp::client::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
@@ -32,7 +32,7 @@ struct ClientConfig {
 	bind_address: Option<String>,
 	server_address: Option<String>,
 	secret: Option<String>,
-	fps_limit: Option<usize>
+	fps_limit: Option<usize>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -41,7 +41,7 @@ struct ServerConfig {
 	server_address: Option<String>,
 	secret: Option<String>,
 	program: Option<String>,
-	devices: Option<HashMap<String, DeviceConfig>>
+	devices: Option<HashMap<String, DeviceConfig>>,
 }
 
 fn vm_from_options(options: &ArgMatches) -> VM {
@@ -316,7 +316,9 @@ fn main() -> std::io::Result<()> {
 
 		let vm = vm_from_options(&client_matches);
 		let mut client = Client::new(vm, &secret.as_bytes(), fps_limit);
-		client.run(&bind_address, &server_address).expect("running the client failed");
+		client
+			.run(&bind_address, &server_address)
+			.expect("running the client failed");
 	} else if let Some(run_matches) = matches.subcommand_matches("run") {
 		let interpret_as_binary = run_matches.is_present("binary");
 
@@ -455,7 +457,7 @@ fn main() -> std::io::Result<()> {
 
 		let default_program = match default_program_path {
 			Some(path) => Program::from_file(&path).expect("error reading specified program file"),
-			None => default_serve_program()
+			None => default_serve_program(),
 		};
 
 		// Start server
@@ -500,4 +502,3 @@ fn default_serve_program() -> Program {
 		});
 	program
 }
-

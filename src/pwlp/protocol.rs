@@ -3,8 +3,8 @@ use hmacsha1::hmac_sha1;
 
 use eui48::MacAddress;
 use std::convert::TryInto;
-use std::time::SystemTime;
 use std::error::Error;
+use std::time::SystemTime;
 
 #[derive(Debug)]
 #[repr(u8)]
@@ -62,12 +62,18 @@ const MESSAGE_TYPE_SIZE: usize = 1;
 const TIME_SIZE: usize = 4;
 
 impl Message {
-	pub fn new(message_type: MessageType, address: &MacAddress, payload: Option<&[u8]>) -> Result<Message, Box<dyn Error>> {
+	pub fn new(
+		message_type: MessageType,
+		address: &MacAddress,
+		payload: Option<&[u8]>,
+	) -> Result<Message, Box<dyn Error>> {
 		Ok(Message {
 			mac_address: *address,
 			message_type: message_type,
 			payload: payload.map(|x| x.to_vec()),
-			unix_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as u32
+			unix_time: SystemTime::now()
+				.duration_since(SystemTime::UNIX_EPOCH)?
+				.as_secs() as u32,
 		})
 	}
 

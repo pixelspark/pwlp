@@ -1,8 +1,8 @@
 use super::instructions::{Binary, Prefix, Unary};
 use super::program::Program;
 use super::strip::Strip;
-use rand::{Rng, SeedableRng};
 use rand::rngs::ThreadRng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -15,7 +15,7 @@ pub struct State<'a> {
 	instruction_count: usize,
 	instruction_limit: Option<usize>,
 	deterministic_rng: ChaCha20Rng,
-	rng: ThreadRng
+	rng: ThreadRng,
 }
 
 pub struct VM {
@@ -34,7 +34,7 @@ pub enum Outcome {
 	Ended,
 	InstructionLimitReached,
 	Yielded,
-	Error(VMError)
+	Error(VMError),
 }
 
 impl<'a> State<'a> {
@@ -48,10 +48,9 @@ impl<'a> State<'a> {
 			instruction_limit,
 			instruction_count: 0,
 			deterministic_rng: ChaCha20Rng::from_seed([0u8; 32]),
-			rng: rand::thread_rng()
+			rng: rand::thread_rng(),
 		}
 	}
-
 	pub fn pc(&self) -> usize {
 		self.pc
 	}
@@ -148,7 +147,7 @@ impl<'a> State<'a> {
 									self.pc + 3
 								}
 							}
-							_ => return Outcome::Error(VMError::UnknownInstruction)
+							_ => return Outcome::Error(VMError::UnknownInstruction),
 						};
 
 						if self.vm.trace {
@@ -346,7 +345,7 @@ impl<'a> State<'a> {
 								// TWOBYTE
 								return Outcome::Error(VMError::UnknownInstruction);
 							}
-							_ => return Outcome::Error(VMError::UnknownInstruction)
+							_ => return Outcome::Error(VMError::UnknownInstruction),
 						}
 
 						if self.vm.trace {
@@ -355,7 +354,7 @@ impl<'a> State<'a> {
 								13 => "dump",
 								14 => "yield",
 								15 => "twobyte",
-								_ => return Outcome::Error(VMError::UnknownInstruction)
+								_ => return Outcome::Error(VMError::UnknownInstruction),
 							};
 
 							print!("\t{}", name);

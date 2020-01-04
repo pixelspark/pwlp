@@ -334,12 +334,11 @@ impl fmt::Debug for Program {
 				write!(f, "{:04}.\t{:02x}\t{}", pc, self.code[pc], i)?;
 				match i {
 					Prefix::PUSHI => {
-						let end = (postfix as usize) *4 + pc + 1;
+						let end = (postfix as usize) * 4 + pc + 1;
 						if end > self.code.len() {
 							write!(f, "\t(invalid, overruns code; size={})", (postfix as usize))?;
 							return Ok(());
-						}
-						else {
+						} else {
 							write!(
 								f,
 								"\t{:02x?}",
@@ -351,14 +350,16 @@ impl fmt::Debug for Program {
 					Prefix::PUSHB => {
 						if postfix == 0 {
 							write!(f, "\t0")?;
-						} 
-						else {
+						} else {
 							let end = (postfix as usize) + pc + 1;
 							if end > self.code.len() {
-								write!(f, "\t(invalid, overruns code; size={})", (postfix as usize))?;
+								write!(
+									f,
+									"\t(invalid, overruns code; size={})",
+									(postfix as usize)
+								)?;
 								return Ok(());
-							}
-							else {
+							} else {
 								write!(
 									f,
 									"\t{:02x?}",

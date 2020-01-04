@@ -46,11 +46,10 @@ impl Server {
 							let canonical_mac = mac.to_canonical();
 							if devices.contains_key(&canonical_mac) {
 								Some(&devices[&canonical_mac])
-							}
-							else {
+							} else {
 								None
 							}
-						},
+						}
 						None => None,
 					};
 
