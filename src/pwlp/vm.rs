@@ -364,6 +364,7 @@ impl<'a> VM {
 		}
 	}
 
+	#[allow(clippy::borrowed_box)]
 	pub fn strip(&'a mut self) -> &'a mut Box<dyn Strip> {
 		&mut self.strip
 	}
