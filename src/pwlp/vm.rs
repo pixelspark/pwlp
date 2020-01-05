@@ -1,4 +1,4 @@
-use super::instructions::{Binary, Prefix, Unary};
+use super::instructions::{Binary, Prefix, Special, Unary, UserCommand};
 use super::program::Program;
 use super::strip::Strip;
 use rand::rngs::ThreadRng;
@@ -56,6 +56,146 @@ impl<'a> State<'a> {
 		self.pc
 	}
 
+	fn pushi(&mut self, postfix: u8) {
+		for _ in 0..postfix {
+			let value = u32::from(self.program.code[self.pc + 1])
+				| u32::from(self.program.code[self.pc + 2]) << 8
+				| u32::from(self.program.code[self.pc + 3]) << 16
+				| u32::from(self.program.code[self.pc + 4]) << 24;
+			self.stack.push(value);
+
+			if self.vm.trace {
+				print!("\tv={}", value);
+			}
+			self.pc += 4;
+		}
+	}
+
+	fn pushb(&mut self, postfix: u8) {
+		if postfix == 0 {
+			self.stack.push(0);
+		} else {
+			for _ in 0..postfix {
+				self.pc += 1;
+				if self.vm.trace {
+					print!("\tv={}", self.program.code[self.pc]);
+				}
+				self.stack.push(u32::from(self.program.code[self.pc]));
+			}
+		}
+	}
+
+	fn user(&mut self, postfix: u8) -> Option<Outcome> {
+		let user = UserCommand::from(postfix);
+
+		match user {
+			None => Some(Outcome::Error(VMError::UnknownInstruction)),
+			Some(UserCommand::GET_LENGTH) => {
+				self.stack.push(self.vm.strip.length() as u32);
+				None
+			}
+			Some(UserCommand::GET_WALL_TIME) => {
+				if self.vm.deterministic {
+					self.stack.push((self.instruction_count / 10) as u32);
+				} else {
+					let time = SystemTime::now()
+						.duration_since(UNIX_EPOCH)
+						.unwrap()
+						.as_secs();
+					self.stack.push((time & std::u32::MAX as u64) as u32); // Wrap around when we exceed u32::MAX
+				}
+				None
+			}
+			Some(UserCommand::GET_PRECISE_TIME) => {
+				if self.vm.deterministic {
+					self.stack.push(self.instruction_count as u32);
+				} else {
+					let time = SystemTime::now()
+						.duration_since(self.start_time)
+						.unwrap()
+						.as_millis();
+					self.stack.push((time & std::u32::MAX as u128) as u32); // Wrap around when we exceed u32::MAX
+				}
+				None
+			}
+			Some(UserCommand::SET_PIXEL) => {
+				if self.stack.is_empty() {
+					return Some(Outcome::Error(VMError::StackUnderflow));
+				}
+				let v = self.stack.last().unwrap();
+				let idx = (v & 0xFF) as u8;
+				let r = (((v >> 8) as u32) & 0xFF) as u8;
+				let g = (((v >> 16) as u32) & 0xFF) as u8;
+				let b = (((v >> 24) as u32) & 0xFF) as u8;
+				if self.vm.trace {
+					print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
+				}
+				self.vm.strip.set_pixel(idx, r, g, b);
+				None
+			}
+			Some(UserCommand::BLIT) => {
+				if self.vm.trace {
+					print!("\tblit");
+				}
+				self.vm.strip.blit();
+				None
+			}
+			Some(UserCommand::RANDOM_INT) => {
+				if self.stack.is_empty() {
+					return Some(Outcome::Error(VMError::StackUnderflow));
+				}
+				let v = self.stack.pop().unwrap();
+				if self.vm.deterministic {
+					self.stack.push(self.deterministic_rng.gen_range(0, v));
+				} else {
+					self.stack.push(self.rng.gen_range(0, v));
+				}
+				None
+			}
+			Some(UserCommand::GET_PIXEL) => {
+				if self.stack.is_empty() {
+					return Some(Outcome::Error(VMError::StackUnderflow));
+				}
+				let v = self.stack.pop().unwrap();
+				let color = self.vm.strip.get_pixel((v & 0xFF) as u8);
+				let color_value = (v & 0xFF)
+					| (color.r as u32) << 8
+					| (color.g as u32) << 16
+					| (color.b as u32) << 24;
+				self.stack.push(color_value);
+				None
+			}
+		}
+	}
+
+	fn special(&mut self, postfix: u8) -> Option<Outcome> {
+		let special = Special::from(postfix);
+		print!("\t{:?}", special);
+		match special {
+			None => Some(Outcome::Error(VMError::UnknownInstruction)),
+			Some(Special::SWAP) => {
+				if self.stack.len() < 2 {
+					return Some(Outcome::Error(VMError::StackUnderflow));
+				}
+				let lhs = self.stack.pop().unwrap();
+				let rhs = self.stack.pop().unwrap();
+				self.stack.push(lhs);
+				self.stack.push(rhs);
+				None
+			}
+			Some(Special::DUMP) => {
+				// DUMP
+				println!("DUMP: {:?}", self.stack);
+				None
+			}
+			Some(Special::YIELD) => {
+				self.pc += 1;
+				Some(Outcome::Yielded)
+			}
+			Some(Special::TWOBYTE) => Some(Outcome::Error(VMError::UnknownInstruction)),
+		}
+	}
+
 	pub fn run(&mut self, local_instruction_limit: Option<usize>) -> Outcome {
 		let mut local_instruction_count = 0;
 		while self.pc < self.program.code.len() {
@@ -85,33 +225,19 @@ impl<'a> State<'a> {
 
 				match i {
 					Prefix::PUSHI => {
-						for _ in 0..postfix {
-							let value = u32::from(self.program.code[self.pc + 1])
-								| u32::from(self.program.code[self.pc + 2]) << 8
-								| u32::from(self.program.code[self.pc + 3]) << 16
-								| u32::from(self.program.code[self.pc + 4]) << 24;
-							self.stack.push(value);
-
-							if self.vm.trace {
-								print!("\tv={}", value);
-							}
-							self.pc += 4;
-						}
+						self.pushi(postfix);
 					}
 					Prefix::PUSHB => {
-						if postfix == 0 {
-							self.stack.push(0);
-						} else {
-							for _ in 0..postfix {
-								self.pc += 1;
-								if self.vm.trace {
-									print!("\tv={}", self.program.code[self.pc]);
-								}
-								self.stack.push(u32::from(self.program.code[self.pc]));
-							}
-						}
+						self.pushb(postfix);
 					}
 					Prefix::POP => {
+						assert!(
+							(postfix as usize) < self.stack.len(),
+							"cannot pop beyond stack (index {} > stack size {})!",
+							postfix,
+							self.stack.len()
+						);
+
 						for _ in 0..postfix {
 							let _ = self.stack.pop();
 						}
@@ -136,7 +262,7 @@ impl<'a> State<'a> {
 						self.pc = match i {
 							Prefix::JMP => target,
 							Prefix::JZ => {
-								if self.stack.len() < 1 {
+								if self.stack.is_empty() {
 									return Outcome::Error(VMError::StackUnderflow);
 								}
 								let head = self.stack.last().unwrap();
@@ -147,7 +273,7 @@ impl<'a> State<'a> {
 								}
 							}
 							Prefix::JNZ => {
-								if self.stack.len() < 1 {
+								if self.stack.is_empty() {
 									return Outcome::Error(VMError::StackUnderflow);
 								}
 								let head = self.stack.last().unwrap();
@@ -172,202 +298,36 @@ impl<'a> State<'a> {
 							}
 							let rhs = self.stack.pop().unwrap();
 							let lhs = self.stack.pop().unwrap();
-							self.stack.push(match op {
-								Binary::ADD => lhs + rhs,
-								Binary::SUB => lhs - rhs,
-								Binary::MUL => lhs * rhs,
-								Binary::DIV => lhs / rhs,
-								Binary::MOD => lhs % rhs,
-								Binary::AND => lhs & rhs,
-								Binary::OR => lhs | rhs,
-								Binary::SHL => lhs << rhs,
-								Binary::SHR => lhs >> rhs,
-								Binary::XOR => lhs ^ rhs,
-								Binary::EQ => {
-									if lhs == rhs {
-										1
-									} else {
-										0
-									}
-								}
-								Binary::NEQ => {
-									if lhs != rhs {
-										1
-									} else {
-										0
-									}
-								}
-								Binary::GT => {
-									if lhs > rhs {
-										1
-									} else {
-										0
-									}
-								}
-								Binary::GTE => {
-									if lhs >= rhs {
-										1
-									} else {
-										0
-									}
-								}
-								Binary::LT => {
-									if lhs < rhs {
-										1
-									} else {
-										0
-									}
-								}
-								Binary::LTE => {
-									if lhs <= rhs {
-										1
-									} else {
-										0
-									}
-								}
-							})
+							self.stack.push(op.apply(lhs, rhs))
 						} else {
 							if self.vm.trace {
 								println!("invalid binary postfix: {}", postfix);
 							}
-							break;
+							return Outcome::Error(VMError::UnknownInstruction);
 						}
 					}
 					Prefix::UNARY => {
 						if let Some(op) = Unary::from(postfix) {
-							if self.stack.len() < 1 {
+							if self.stack.is_empty() {
 								return Outcome::Error(VMError::StackUnderflow);
 							}
 							let lhs = self.stack.pop().unwrap();
-							self.stack.push(match op {
-								Unary::DEC => lhs - 1,
-								Unary::INC => lhs + 1,
-								Unary::NEG => unimplemented!(),
-								Unary::NOT => !lhs,
-								Unary::SHL8 => lhs << 8,
-								Unary::SHR8 => lhs >> 8,
-							});
+							self.stack.push(op.apply(lhs));
 						} else {
 							if self.vm.trace {
 								println!("invalid binary postfix: {}", postfix);
 							}
-							break;
-						}
-					}
-					Prefix::USER => match postfix {
-						0 => self.stack.push(self.vm.strip.length() as u32),
-						1 => {
-							// GET_WALL_TIME
-							if self.vm.deterministic {
-								self.stack.push((self.instruction_count / 10) as u32);
-							} else {
-								let time = SystemTime::now()
-									.duration_since(UNIX_EPOCH)
-									.unwrap()
-									.as_secs();
-								self.stack.push((time & std::u32::MAX as u64) as u32); // Wrap around when we exceed u32::MAX
-							}
-						}
-						2 => {
-							// GET_PRECISE_TIME
-							if self.vm.deterministic {
-								self.stack.push(self.instruction_count as u32);
-							} else {
-								let time = SystemTime::now()
-									.duration_since(self.start_time)
-									.unwrap()
-									.as_millis();
-								self.stack.push((time & std::u32::MAX as u128) as u32); // Wrap around when we exceed u32::MAX
-							}
-						}
-						3 => {
-							if self.stack.len() < 1 {
-								return Outcome::Error(VMError::StackUnderflow);
-							}
-							let v = self.stack.last().unwrap();
-							let idx = (v & 0xFF) as u8;
-							let r = (((v >> 8) as u32) & 0xFF) as u8;
-							let g = (((v >> 16) as u32) & 0xFF) as u8;
-							let b = (((v >> 24) as u32) & 0xFF) as u8;
-							if self.vm.trace {
-								print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
-							}
-							self.vm.strip.set_pixel(idx, r, g, b);
-						}
-						4 => {
-							if self.vm.trace {
-								print!("\tblit");
-							}
-							self.vm.strip.blit();
-						}
-						5 => {
-							// RANDOM_INT
-							if self.stack.len() < 1 {
-								return Outcome::Error(VMError::StackUnderflow);
-							}
-							let v = self.stack.pop().unwrap();
-							if self.vm.deterministic {
-								self.stack.push(self.deterministic_rng.gen_range(0, v));
-							} else {
-								self.stack.push(self.rng.gen_range(0, v));
-							}
-						}
-						6 => {
-							// GET_PIXEL
-							if self.stack.len() < 1 {
-								return Outcome::Error(VMError::StackUnderflow);
-							}
-							let v = self.stack.pop().unwrap();
-							let color = self.vm.strip.get_pixel((v & 0xFF) as u8);
-							let color_value = (v & 0xFF)
-								| (color.r as u32) << 8 | (color.g as u32) << 16
-								| (color.b as u32) << 24;
-							self.stack.push(color_value);
-						}
-						_ => {
-							if self.vm.trace {
-								print!("\t(unknown user function)");
-							}
 							return Outcome::Error(VMError::UnknownInstruction);
 						}
-					},
-					Prefix::SPECIAL => {
-						match postfix {
-							12 => {
-								// SWAP
-								if self.stack.len() < 2 {
-									return Outcome::Error(VMError::StackUnderflow);
-								}
-								let lhs = self.stack.pop().unwrap();
-								let rhs = self.stack.pop().unwrap();
-								self.stack.push(lhs);
-								self.stack.push(rhs);
-							}
-							13 => {
-								// DUMP
-								println!("DUMP: {:?}", self.stack);
-							}
-							14 => {
-								self.pc += 1;
-								return Outcome::Yielded;
-							}
-							15 => {
-								// TWOBYTE
-								return Outcome::Error(VMError::UnknownInstruction);
-							}
-							_ => return Outcome::Error(VMError::UnknownInstruction),
+					}
+					Prefix::USER => {
+						if let Some(outcome) = self.user(postfix) {
+							return outcome;
 						}
-
-						if self.vm.trace {
-							let name = match postfix {
-								12 => "swap",
-								13 => "dump",
-								14 => "yield",
-								15 => "twobyte",
-								_ => return Outcome::Error(VMError::UnknownInstruction),
-							};
-
-							print!("\t{}", name);
+					}
+					Prefix::SPECIAL => {
+						if let Some(outcome) = self.special(postfix) {
+							return outcome;
 						}
 					}
 				}

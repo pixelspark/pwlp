@@ -66,7 +66,7 @@ impl Client {
 
 			loop {
 				// Send a welcome message
-				let welcome = Message::new(MessageType::Ping, &mac_address, None)
+				let welcome = Message::new(MessageType::Ping, mac_address, None)
 					.expect("message construction failed");
 				let signed = welcome.signed(&secret);
 				println!("Sending welcome to server {}", server_address);
@@ -156,7 +156,7 @@ impl Client {
 					match outcome {
 						Outcome::LocalInstructionLimitReached => {
 							// Just continue on a new cycle
-						},
+						}
 						Outcome::Yielded => {
 							if let Some(frame_time) = frame_time {
 								let now = SystemTime::now();

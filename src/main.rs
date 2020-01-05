@@ -44,51 +44,6 @@ struct ServerConfig {
 	devices: Option<HashMap<String, DeviceConfig>>,
 }
 
-fn vm_from_options(options: &ArgMatches) -> VM {
-	let length = options
-		.value_of("length")
-		.unwrap_or("10")
-		.parse::<u8>()
-		.unwrap();
-
-	let strip = strip::DummyStrip::new(length, true);
-	let mut vm = VM::new(Box::new(strip));
-
-	#[cfg(feature = "raspberrypi")]
-	{
-		if options.is_present("hardware") {
-			let spi_bus = match options.value_of("bus") {
-				Some(bus_str) => match bus_str {
-					"0" => spi::Bus::Spi0,
-					"1" => spi::Bus::Spi1,
-					"2" => spi::Bus::Spi2,
-					_ => panic!("invalid SPI bus number (should be 0, 1 or 2)"),
-				},
-				None => spi::Bus::Spi0,
-			};
-
-			let ss = match options.value_of("ss") {
-				Some(ss_str) => match ss_str {
-					"0" => spi::SlaveSelect::Ss0,
-					"1" => spi::SlaveSelect::Ss1,
-					"2" => spi::SlaveSelect::Ss2,
-					_ => panic!("invalid SS number (should be 0, 1 or 2)"),
-				},
-				None => spi::SlaveSelect::Ss0,
-			};
-
-			let spi = spi::Spi::new(spi_bus, ss, 2_000_000, spi::Mode::Mode0)
-				.expect("spi bus could not be created");
-			let strip = strip::spi_strip::SPIStrip::new(spi, length);
-			vm = VM::new(Box::new(strip));
-		}
-	}
-
-	vm.set_trace(options.is_present("trace"));
-	vm.set_deterministic(options.is_present("deterministic"));
-	vm
-}
-
 fn main() -> std::io::Result<()> {
 	let matches = App::new("pwlp-server")
 		.version("1.0")
@@ -275,197 +230,269 @@ fn main() -> std::io::Result<()> {
 
 	// Find out which subcommand to perform
 	if let Some(client_matches) = matches.subcommand_matches("client") {
-		let mut bind_address: String = String::from("0.0.0.0:33332");
-		let mut secret: String = String::from("secret");
-		let mut server_address: String = String::from("224.0.0.1:33333");
-		let mut fps_limit = Some(60);
-
-		// Read configured values
-		if let Some(client_config) = config.client {
-			if let Some(v) = client_config.bind_address {
-				bind_address = v.to_string();
-			}
-			if let Some(v) = client_config.server_address {
-				server_address = v.to_string();
-			}
-			if let Some(v) = client_config.secret {
-				secret = v.to_string();
-			}
-			if let Some(v) = client_config.fps_limit {
-				fps_limit = Some(v);
-			}
-		}
-
-		// Read arguments
-		if let Some(v) = client_matches.value_of("bind") {
-			bind_address = v.to_string();
-		}
-		if let Some(v) = client_matches.value_of("server") {
-			server_address = v.to_string();
-		}
-		if let Some(v) = client_matches.value_of("secret") {
-			secret = v.to_string();
-		}
-		if let Some(v) = client_matches.value_of("fps-limit") {
-			fps_limit = Some(v.parse().unwrap());
-		}
-
-		if fps_limit == Some(0) {
-			fps_limit = None;
-		}
-
-		let vm = vm_from_options(&client_matches);
-		let mut client = Client::new(vm, &secret.as_bytes(), fps_limit);
-		client
-			.run(&bind_address, &server_address)
-			.expect("running the client failed");
+		return client(config, client_matches);
 	} else if let Some(run_matches) = matches.subcommand_matches("run") {
-		let interpret_as_binary = run_matches.is_present("binary");
-
-		let program = if interpret_as_binary {
-			let mut source = Vec::<u8>::new();
-			if let Some(source_file) = run_matches.value_of("file") {
-				File::open(source_file)?.read_to_end(&mut source)?;
-			} else {
-				stdin().read_to_end(&mut source)?;
-			}
-			Program::from_binary(source)
-		} else {
-			let mut source = String::new();
-			if let Some(source_file) = run_matches.value_of("file") {
-				File::open(source_file)?.read_to_string(&mut source)?;
-			} else {
-				stdin().read_to_string(&mut source)?;
-			}
-			match parse(&source) {
-				Ok(prg) => prg,
-				Err(s) => panic!("Parsing failed: {}", s),
-			}
-		};
-
-		let instruction_limit: Option<usize> = if run_matches.is_present("instruction-limit") {
-			Some(
-				run_matches
-					.value_of("instruction-limit")
-					.unwrap()
-					.parse::<usize>()
-					.expect("invalid limit number"),
-			)
-		} else {
-			None
-		};
-
-		let fps: Option<u64> = if run_matches.is_present("fps-limit") {
-			Some(
-				run_matches
-					.value_of("fps-limit")
-					.unwrap()
-					.parse::<u64>()
-					.expect("invalid FPS limit number"),
-			)
-		} else {
-			None
-		};
-
-		let mut vm = vm_from_options(&run_matches);
-		let mut state = vm.start(program, instruction_limit);
-		let mut last_yield_time = SystemTime::now();
-		let frame_time = if let Some(fps) = fps {
-			Some(Duration::from_millis(1000 / fps))
-		} else {
-			None
-		};
-		let mut running = true;
-
-		while running {
-			match state.run(None) {
-				Outcome::Yielded => {
-					if let Some(frame_time) = frame_time {
-						let now = SystemTime::now();
-						let passed = now.duration_since(last_yield_time).unwrap();
-						if passed < frame_time {
-							// We have some time left in this frame, sit it out
-							std::thread::sleep(frame_time - passed);
-						}
-						last_yield_time = now;
-					}
-				}
-				Outcome::GlobalInstructionLimitReached | Outcome::LocalInstructionLimitReached | Outcome::Ended => running = false,
-				Outcome::Error(e) => {
-					println!("Error in VM at pc={}: {:?}", state.pc(), e);
-				}
-			}
-		}
+		return run(run_matches);
 	} else if let Some(matches) = matches.subcommand_matches("compile") {
-		let mut source = String::new();
-		if let Some(source_file) = matches.value_of("file") {
-			File::open(source_file)?.read_to_string(&mut source)?;
-		} else {
-			stdin().read_to_string(&mut source)?;
-		}
-
-		match parse(&source) {
-			Ok(prg) => {
-				if !matches.is_present("output") {
-					println!("Program:\n{:?}", &prg);
-				}
-				if let Some(out_file) = matches.value_of("output") {
-					File::create(out_file)?.write_all(&prg.code)?;
-				}
-			}
-			Err(s) => println!("Error: {}", s),
-		};
+		return compile(matches);
 	} else if let Some(matches) = matches.subcommand_matches("disassemble") {
+		return disassemble(matches);
+	} else if let Some(matches) = matches.subcommand_matches("serve") {
+		return serve(config, matches);
+	};
+	Ok(())
+}
+
+fn client(config: Config, client_matches: &ArgMatches) -> std::io::Result<()> {
+	let mut bind_address: String = String::from("0.0.0.0:33332");
+	let mut secret: String = String::from("secret");
+	let mut server_address: String = String::from("224.0.0.1:33333");
+	let mut fps_limit = Some(60);
+
+	// Read configured values
+	if let Some(client_config) = config.client {
+		if let Some(v) = client_config.bind_address {
+			bind_address = v;
+		}
+		if let Some(v) = client_config.server_address {
+			server_address = v;
+		}
+		if let Some(v) = client_config.secret {
+			secret = v;
+		}
+		if let Some(v) = client_config.fps_limit {
+			fps_limit = Some(v);
+		}
+	}
+
+	// Read arguments
+	if let Some(v) = client_matches.value_of("bind") {
+		bind_address = v.to_string();
+	}
+	if let Some(v) = client_matches.value_of("server") {
+		server_address = v.to_string();
+	}
+	if let Some(v) = client_matches.value_of("secret") {
+		secret = v.to_string();
+	}
+	if let Some(v) = client_matches.value_of("fps-limit") {
+		fps_limit = Some(v.parse().unwrap());
+	}
+
+	if fps_limit == Some(0) {
+		fps_limit = None;
+	}
+
+	let vm = vm_from_options(&client_matches);
+	let mut client = Client::new(vm, &secret.as_bytes(), fps_limit);
+	client
+		.run(&bind_address, &server_address)
+		.expect("running the client failed");
+	Ok(())
+}
+
+fn run(run_matches: &ArgMatches) -> std::io::Result<()> {
+	let interpret_as_binary = run_matches.is_present("binary");
+
+	let program = if interpret_as_binary {
 		let mut source = Vec::<u8>::new();
-		if let Some(source_file) = matches.value_of("file") {
+		if let Some(source_file) = run_matches.value_of("file") {
 			File::open(source_file)?.read_to_end(&mut source)?;
 		} else {
 			stdin().read_to_end(&mut source)?;
 		}
-
-		let program = Program::from_binary(source);
-		println!("{:?}", program);
-	} else if let Some(matches) = matches.subcommand_matches("serve") {
-		let mut global_secret = String::from("secret");
-		let mut default_program_path: Option<String> = None;
-		let mut bind_address = String::from("0.0.0.0:33333");
-		let mut devices: Option<HashMap<String, DeviceConfig>> = None;
-
-		// Read configured values
-		if let Some(server_config) = config.server {
-			if let Some(v) = server_config.secret {
-				global_secret = v.to_string();
-			}
-
-			if let Some(v) = server_config.program {
-				default_program_path = Some(v.to_string());
-			}
-
-			if let Some(v) = server_config.bind_address {
-				bind_address = v.to_string();
-			}
-			devices = server_config.devices;
+		Program::from_binary(source)
+	} else {
+		let mut source = String::new();
+		if let Some(source_file) = run_matches.value_of("file") {
+			File::open(source_file)?.read_to_string(&mut source)?;
+		} else {
+			stdin().read_to_string(&mut source)?;
 		}
-
-		// Read arguments
-		if let Some(v) = matches.value_of("program") {
-			default_program_path = Some(v.to_string());
+		match parse(&source) {
+			Ok(prg) => prg,
+			Err(s) => panic!("Parsing failed: {}", s),
 		}
-		if let Some(v) = matches.value_of("bind") {
-			bind_address = v.to_string();
+	};
+
+	let instruction_limit: Option<usize> = if run_matches.is_present("instruction-limit") {
+		Some(
+			run_matches
+				.value_of("instruction-limit")
+				.unwrap()
+				.parse::<usize>()
+				.expect("invalid limit number"),
+		)
+	} else {
+		None
+	};
+
+	let fps: Option<u64> = if run_matches.is_present("fps-limit") {
+		Some(
+			run_matches
+				.value_of("fps-limit")
+				.unwrap()
+				.parse::<u64>()
+				.expect("invalid FPS limit number"),
+		)
+	} else {
+		None
+	};
+
+	let mut vm = vm_from_options(&run_matches);
+	let mut state = vm.start(program, instruction_limit);
+	let mut last_yield_time = SystemTime::now();
+	let frame_time = if let Some(fps) = fps {
+		Some(Duration::from_millis(1000 / fps))
+	} else {
+		None
+	};
+	let mut running = true;
+
+	while running {
+		match state.run(None) {
+			Outcome::Yielded => {
+				if let Some(frame_time) = frame_time {
+					let now = SystemTime::now();
+					let passed = now.duration_since(last_yield_time).unwrap();
+					if passed < frame_time {
+						// We have some time left in this frame, sit it out
+						std::thread::sleep(frame_time - passed);
+					}
+					last_yield_time = now;
+				}
+			}
+			Outcome::GlobalInstructionLimitReached
+			| Outcome::LocalInstructionLimitReached
+			| Outcome::Ended => running = false,
+			Outcome::Error(e) => {
+				println!("Error in VM at pc={}: {:?}", state.pc(), e);
+			}
 		}
+	}
+	Ok(())
+}
 
-		let default_program = match default_program_path {
-			Some(path) => Program::from_file(&path).expect("error reading specified program file"),
-			None => default_serve_program(),
-		};
+fn compile(matches: &ArgMatches) -> std::io::Result<()> {
+	let mut source = String::new();
+	if let Some(source_file) = matches.value_of("file") {
+		File::open(source_file)?.read_to_string(&mut source)?;
+	} else {
+		stdin().read_to_string(&mut source)?;
+	}
 
-		// Start server
-		let mut server = Server::new(devices, &global_secret, default_program);
-		println!("PWLP server listening at {}", bind_address);
-		server.run(&bind_address)?;
+	match parse(&source) {
+		Ok(prg) => {
+			if !matches.is_present("output") {
+				println!("Program:\n{:?}", &prg);
+			}
+			if let Some(out_file) = matches.value_of("output") {
+				File::create(out_file)?.write_all(&prg.code)?;
+			}
+		}
+		Err(s) => println!("Error: {}", s),
 	};
 	Ok(())
+}
+
+fn disassemble(matches: &ArgMatches) -> std::io::Result<()> {
+	let mut source = Vec::<u8>::new();
+	if let Some(source_file) = matches.value_of("file") {
+		File::open(source_file)?.read_to_end(&mut source)?;
+	} else {
+		stdin().read_to_end(&mut source)?;
+	}
+
+	let program = Program::from_binary(source);
+	println!("{:?}", program);
+	Ok(())
+}
+
+fn serve(config: Config, serve_matches: &ArgMatches) -> std::io::Result<()> {
+	let mut global_secret = String::from("secret");
+	let mut default_program_path: Option<String> = None;
+	let mut bind_address = String::from("0.0.0.0:33333");
+	let mut devices: Option<HashMap<String, DeviceConfig>> = None;
+
+	// Read configured values
+	if let Some(server_config) = config.server {
+		if let Some(v) = server_config.secret {
+			global_secret = v;
+		}
+
+		if let Some(v) = server_config.program {
+			default_program_path = Some(v);
+		}
+
+		if let Some(v) = server_config.bind_address {
+			bind_address = v;
+		}
+		devices = server_config.devices;
+	}
+
+	// Read arguments
+	if let Some(v) = serve_matches.value_of("program") {
+		default_program_path = Some(v.to_string());
+	}
+	if let Some(v) = serve_matches.value_of("bind") {
+		bind_address = v.to_string();
+	}
+
+	let default_program = match default_program_path {
+		Some(path) => Program::from_file(&path).expect("error reading specified program file"),
+		None => default_serve_program(),
+	};
+
+	// Start server
+	let mut server = Server::new(devices, &global_secret, default_program);
+	println!("PWLP server listening at {}", bind_address);
+	server.run(&bind_address)?;
+	Ok(())
+}
+
+fn vm_from_options(options: &ArgMatches) -> VM {
+	let length = options
+		.value_of("length")
+		.unwrap_or("10")
+		.parse::<u8>()
+		.unwrap();
+
+	let strip = strip::DummyStrip::new(length, true);
+	let mut vm = VM::new(Box::new(strip));
+
+	#[cfg(feature = "raspberrypi")]
+	{
+		if options.is_present("hardware") {
+			let spi_bus = match options.value_of("bus") {
+				Some(bus_str) => match bus_str {
+					"0" => spi::Bus::Spi0,
+					"1" => spi::Bus::Spi1,
+					"2" => spi::Bus::Spi2,
+					_ => panic!("invalid SPI bus number (should be 0, 1 or 2)"),
+				},
+				None => spi::Bus::Spi0,
+			};
+
+			let ss = match options.value_of("ss") {
+				Some(ss_str) => match ss_str {
+					"0" => spi::SlaveSelect::Ss0,
+					"1" => spi::SlaveSelect::Ss1,
+					"2" => spi::SlaveSelect::Ss2,
+					_ => panic!("invalid SS number (should be 0, 1 or 2)"),
+				},
+				None => spi::SlaveSelect::Ss0,
+			};
+
+			let spi = spi::Spi::new(spi_bus, ss, 2_000_000, spi::Mode::Mode0)
+				.expect("spi bus could not be created");
+			let strip = strip::spi_strip::SPIStrip::new(spi, length);
+			vm = VM::new(Box::new(strip));
+		}
+	}
+
+	vm.set_trace(options.is_present("trace"));
+	vm.set_deterministic(options.is_present("deterministic"));
+	vm
 }
 
 fn default_serve_program() -> Program {

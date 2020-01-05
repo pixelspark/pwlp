@@ -64,12 +64,12 @@ const TIME_SIZE: usize = 4;
 impl Message {
 	pub fn new(
 		message_type: MessageType,
-		address: &MacAddress,
+		address: MacAddress,
 		payload: Option<&[u8]>,
 	) -> Result<Message, Box<dyn Error>> {
 		Ok(Message {
-			mac_address: *address,
-			message_type: message_type,
+			mac_address: address,
+			message_type,
 			payload: payload.map(|x| x.to_vec()),
 			unix_time: SystemTime::now()
 				.duration_since(SystemTime::UNIX_EPOCH)?

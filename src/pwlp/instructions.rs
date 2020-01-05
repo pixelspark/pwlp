@@ -89,6 +89,17 @@ impl Unary {
 			_ => None,
 		}
 	}
+
+	pub fn apply(self, lhs: u32) -> u32 {
+		match self {
+			Unary::DEC => lhs - 1,
+			Unary::INC => lhs + 1,
+			Unary::NEG => unimplemented!(),
+			Unary::NOT => !lhs,
+			Unary::SHL8 => lhs << 8,
+			Unary::SHR8 => lhs >> 8,
+		}
+	}
 }
 
 impl std::fmt::Display for Unary {
@@ -151,6 +162,63 @@ impl Binary {
 			_ => None,
 		}
 	}
+
+	pub fn apply(self, lhs: u32, rhs: u32) -> u32 {
+		match self {
+			Binary::ADD => lhs + rhs,
+			Binary::SUB => lhs - rhs,
+			Binary::MUL => lhs * rhs,
+			Binary::DIV => lhs / rhs,
+			Binary::MOD => lhs % rhs,
+			Binary::AND => lhs & rhs,
+			Binary::OR => lhs | rhs,
+			Binary::SHL => lhs << rhs,
+			Binary::SHR => lhs >> rhs,
+			Binary::XOR => lhs ^ rhs,
+			Binary::EQ => {
+				if lhs == rhs {
+					1
+				} else {
+					0
+				}
+			}
+			Binary::NEQ => {
+				if lhs != rhs {
+					1
+				} else {
+					0
+				}
+			}
+			Binary::GT => {
+				if lhs > rhs {
+					1
+				} else {
+					0
+				}
+			}
+			Binary::GTE => {
+				if lhs >= rhs {
+					1
+				} else {
+					0
+				}
+			}
+			Binary::LT => {
+				if lhs < rhs {
+					1
+				} else {
+					0
+				}
+			}
+			Binary::LTE => {
+				if lhs <= rhs {
+					1
+				} else {
+					0
+				}
+			}
+		}
+	}
 }
 
 impl std::fmt::Display for Binary {
@@ -190,4 +258,31 @@ pub enum UserCommand {
 	BLIT = 4,
 	RANDOM_INT = 5,
 	GET_PIXEL = 6,
+}
+
+impl UserCommand {
+	pub fn from(code: u8) -> Option<UserCommand> {
+		match code {
+			0 => Some(UserCommand::GET_LENGTH),
+			1 => Some(UserCommand::GET_WALL_TIME),
+			2 => Some(UserCommand::GET_PRECISE_TIME),
+			3 => Some(UserCommand::GET_PIXEL),
+			4 => Some(UserCommand::BLIT),
+			5 => Some(UserCommand::RANDOM_INT),
+			6 => Some(UserCommand::GET_PIXEL),
+			_ => None,
+		}
+	}
+}
+
+impl Special {
+	pub fn from(code: u8) -> Option<Special> {
+		match code {
+			12 => Some(Special::SWAP),
+			13 => Some(Special::DUMP),
+			14 => Some(Special::YIELD),
+			15 => Some(Special::TWOBYTE),
+			_ => None,
+		}
+	}
 }
