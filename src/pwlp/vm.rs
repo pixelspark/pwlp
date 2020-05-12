@@ -232,8 +232,8 @@ impl<'a> State<'a> {
 					}
 					Prefix::POP => {
 						assert!(
-							(postfix as usize) < self.stack.len(),
-							"cannot pop beyond stack (index {} > stack size {})!",
+							(postfix as usize) <= self.stack.len(),
+							"cannot pop beyond stack (pop {} elements > stack size {})!",
 							postfix,
 							self.stack.len()
 						);
