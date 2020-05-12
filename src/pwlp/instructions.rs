@@ -266,7 +266,7 @@ impl UserCommand {
 			0 => Some(UserCommand::GET_LENGTH),
 			1 => Some(UserCommand::GET_WALL_TIME),
 			2 => Some(UserCommand::GET_PRECISE_TIME),
-			3 => Some(UserCommand::GET_PIXEL),
+			3 => Some(UserCommand::SET_PIXEL),
 			4 => Some(UserCommand::BLIT),
 			5 => Some(UserCommand::RANDOM_INT),
 			6 => Some(UserCommand::GET_PIXEL),
