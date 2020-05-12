@@ -170,7 +170,7 @@ impl<'a> State<'a> {
 
 	fn special(&mut self, postfix: u8) -> Option<Outcome> {
 		let special = Special::from(postfix);
-		print!("\t{:?}", special);
+
 		match special {
 			None => Some(Outcome::Error(VMError::UnknownInstruction)),
 			Some(Special::SWAP) => {

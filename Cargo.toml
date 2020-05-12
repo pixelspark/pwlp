@@ -20,4 +20,5 @@ rand_chacha = "0.2.1"
 mac_address = "1.0.3"
 
 [features]
+default = []
 raspberrypi = ["rppal"]

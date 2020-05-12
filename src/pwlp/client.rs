@@ -131,7 +131,10 @@ impl Client {
 		loop {
 			let p = program;
 			program = None;
-			println!("Starting p={:?} {:?}", p, program);
+
+			if let Some(p) = &p {
+				println!("Starting program:\n{:?}", p);
+			}
 			let mut state = self.vm.start(p.unwrap(), None);
 			let mut last_yield_time = SystemTime::now();
 			let frame_time = if let Some(fps) = self.fps_limit {

@@ -1,9 +1,11 @@
 use super::program::Program;
 use super::protocol::{Message, MessageType};
 use eui48::MacAddress;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use std::net::UdpSocket;
+use std::net::{UdpSocket, SocketAddr};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct DeviceConfig {
@@ -11,23 +13,37 @@ pub struct DeviceConfig {
 	secret: Option<String>,
 }
 
+#[derive(Serialize, Debug, Clone)]
+pub struct DeviceStatus {
+	address: SocketAddr,
+
+	#[serde(skip)]
+	last_seen: Instant
+}
+
 pub struct Server {
-	devices: Option<HashMap<String, DeviceConfig>>,
+	devices: HashMap<String, DeviceConfig>,
+	status: Arc<Mutex<HashMap<String, DeviceStatus>>>,
 	default_secret: String,
 	default_program: Program,
 }
 
 impl Server {
 	pub fn new(
-		devices: Option<HashMap<String, DeviceConfig>>,
+		devices: HashMap<String, DeviceConfig>,
 		default_secret: &str,
 		default_program: Program,
 	) -> Server {
 		Server {
 			devices,
+			status: Arc::new(Mutex::new(HashMap::new())),
 			default_secret: default_secret.to_string(),
 			default_program,
 		}
+	}
+
+	pub fn status(&mut self) -> Arc<Mutex<HashMap<String, DeviceStatus>>> {
+		self.status.clone()
 	}
 
 	pub fn run(&mut self, bind_address: &str) -> std::io::Result<()> {
@@ -41,16 +57,11 @@ impl Server {
 				Err(t) => println!("\tError reading MAC address: {:?}", t),
 				Ok(mac) => {
 					// Do we have a config for this mac?
-					let device_config: Option<&DeviceConfig> = match &self.devices {
-						Some(devices) => {
-							let canonical_mac = mac.to_canonical();
-							if devices.contains_key(&canonical_mac) {
-								Some(&devices[&canonical_mac])
-							} else {
-								None
-							}
-						}
-						None => None,
+					let canonical_mac = mac.to_canonical();
+					let device_config: Option<&DeviceConfig> = if self.devices.contains_key(&canonical_mac) {
+						Some(&self.devices[&canonical_mac])
+					} else {
+						None
 					};
 
 					// Find the secret to use to verify the message signature
@@ -69,13 +80,33 @@ impl Server {
 							source_address, t, amt, mac, secret
 						),
 						Ok(m) => {
+							let mac_identifier = mac.to_canonical();
 							println!(
 								"{} @ {}: {:?} t={}",
-								mac.to_canonical(),
-								source_address,
+								&mac_identifier,
+								&source_address,
 								m.message_type,
 								m.unix_time
 							);
+
+							// Update or create device status
+							{
+								let mut m = self.status.lock().unwrap();
+								let mut new_status = match m.get(&mac_identifier) {
+									Some(status) => {
+										(*status).clone()
+									},
+									None => {
+										DeviceStatus {
+											address: source_address.clone(),
+											last_seen: Instant::now()
+										}
+									}
+								};
+								new_status.last_seen = Instant::now();
+								println!("{} status: {:?}", &mac_identifier, &new_status);
+								m.insert(mac_identifier, new_status);
+							}
 
 							match m.message_type {
 								MessageType::Ping => {
@@ -87,8 +118,7 @@ impl Server {
 									};
 
 									// Check deserialize
-									Message::from_buffer(&pong.signed(secret), secret)
-										.expect("deserialize own message");
+									assert!(Message::from_buffer(&pong.signed(secret), secret).is_ok(), "deserialize own message");
 
 									if let Err(t) =
 										socket.send_to(&pong.signed(secret), source_address)

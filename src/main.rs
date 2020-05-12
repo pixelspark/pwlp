@@ -412,7 +412,7 @@ fn serve(config: Config, serve_matches: &ArgMatches) -> std::io::Result<()> {
 	let mut global_secret = String::from("secret");
 	let mut default_program_path: Option<String> = None;
 	let mut bind_address = String::from("0.0.0.0:33333");
-	let mut devices: Option<HashMap<String, DeviceConfig>> = None;
+	let mut devices: HashMap<String, DeviceConfig> = HashMap::new();
 
 	// Read configured values
 	if let Some(server_config) = config.server {
@@ -427,7 +427,10 @@ fn serve(config: Config, serve_matches: &ArgMatches) -> std::io::Result<()> {
 		if let Some(v) = server_config.bind_address {
 			bind_address = v;
 		}
-		devices = server_config.devices;
+
+		if let Some(d) = server_config.devices {
+			devices = d;
+		}
 	}
 
 	// Read arguments
