@@ -1,7 +1,6 @@
 use super::instructions::{Binary, Prefix, Special, Unary, UserCommand};
 use super::program::Program;
 use super::strip::Strip;
-use rand::rngs::ThreadRng;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -15,7 +14,6 @@ pub struct State<'a> {
 	instruction_count: usize,
 	instruction_limit: Option<usize>,
 	deterministic_rng: ChaCha20Rng,
-	rng: ThreadRng,
 }
 
 pub struct VM {
@@ -49,7 +47,6 @@ impl<'a> State<'a> {
 			instruction_limit,
 			instruction_count: 0,
 			deterministic_rng: ChaCha20Rng::from_seed([0u8; 32]),
-			rng: rand::thread_rng(),
 		}
 	}
 	pub fn pc(&self) -> usize {
@@ -145,11 +142,7 @@ impl<'a> State<'a> {
 					return Some(Outcome::Error(VMError::StackUnderflow));
 				}
 				let v = self.stack.pop().unwrap();
-				if self.vm.deterministic {
-					self.stack.push(self.deterministic_rng.gen_range(0, v));
-				} else {
-					self.stack.push(self.rng.gen_range(0, v));
-				}
+				self.stack.push(self.deterministic_rng.gen_range(0, v));
 				None
 			}
 			Some(UserCommand::GET_PIXEL) => {
