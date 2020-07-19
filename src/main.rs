@@ -225,7 +225,14 @@ fn main() -> std::io::Result<()> {
 	// Read configuration file
 	let config_file = matches.value_of("config").unwrap_or("config.toml");
 	let mut config_string = String::new();
-	File::open(config_file)?.read_to_string(&mut config_string)?;
+	match File::open(config_file) {
+		Ok(mut config_opened) => {
+			config_opened.read_to_string(&mut config_string)?;
+		},
+		Err(e) => {
+			println!("failed to open configuration file: {:?}", e);
+		}
+	}
 	let config: Config = toml::from_str(&config_string)?;
 
 	// Find out which subcommand to perform
