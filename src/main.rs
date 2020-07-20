@@ -465,7 +465,11 @@ fn vm_from_options(options: &ArgMatches) -> VM {
 		.value_of("length")
 		.unwrap_or("10")
 		.parse::<u8>()
-		.unwrap();
+		.expect("length must be between 1..255");
+
+	if length == 0 {
+		panic!("length cannot be zero");
+	}
 
 	let strip = strip::DummyStrip::new(length, true);
 	let mut vm = VM::new(Box::new(strip));
