@@ -147,7 +147,10 @@ fn addition(input: &str) -> IResult<&str, Expression> {
 	let (input, init) = multiplication(input)?;
 
 	fold_many0(
-		pair(alt((tag("+"), tag("-"))), multiplication),
+		pair(
+			terminated(preceded(sp, alt((tag("+"), tag("-")))), sp), 
+			multiplication
+		),
 		init,
 		|acc, (op, val): (&str, Expression)| {
 			if op == "+" {
