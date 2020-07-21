@@ -1,0 +1,14 @@
+// p = Cycle period
+p = 3;
+loop {
+	r = (get_wall_time / p % 8) * 32;
+	g = (get_wall_time / p / 3 % 8) * 32;
+	b = (get_wall_time / p / 5 % 8) * 32;
+
+	for(i = get_length) {
+		set_pixel(i - 1, r, g, b);
+	};
+
+	blit;
+	yield;
+}
