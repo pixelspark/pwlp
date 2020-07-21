@@ -69,6 +69,10 @@ Consecutive statements are separated by ";". Supported constructs:
 * `if(comparison) { statements }`
 * `loop { statements }`: loops `statements` forever
 * `for(var=expression) { statements }`: counts `var` down from `expression` to zero (inclusive).
+* Comments and whitespace:
+  * `/* may span multiple lines */`
+  * `// single line` (should end in `\n`)
+  * `\r`, `\n`, `\t` and ` ` are whitespace
 * Special commands:
   * `yield`
 * User commands:

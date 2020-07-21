@@ -1,9 +1,9 @@
 use nom::{
 	branch::alt,
-	bytes::complete::{tag, take_while, take_while1},
+	bytes::complete::{tag, take_while, take_while1, is_not},
 	combinator::{map, map_res, opt},
-	multi::{fold_many0, separated_list},
-	sequence::{pair, preceded, terminated, tuple},
+	multi::{fold_many0, separated_list, many0},
+	sequence::{pair, preceded, terminated, tuple, delimited},
 	IResult,
 };
 
@@ -27,9 +27,23 @@ fn is_dec_digit(c: char) -> bool {
 	c.is_digit(10)
 }
 
-fn sp(input: &str) -> IResult<&str, &str> {
+fn whitespace(input: &str) -> IResult<&str, &str> {
 	let chars = " \t\r\n ";
 	take_while(move |c| chars.contains(c))(input)
+}
+
+fn sp(input: &str) -> IResult<&str, ()> {
+	let mut i = input;
+	loop {
+		let (j, x) = whitespace(i)?;
+		let (j, y) = opt(comment)(j)?;
+		let (j, z) = whitespace(j)?;
+		if x.is_empty() && y.is_none() && z.is_empty() {
+			break;
+		}
+		i = j;
+	}
+	return Ok((i, ()));
 }
 
 fn hex_number(input: &str) -> IResult<&str, u32> {
@@ -435,6 +449,18 @@ fn loop_statement(input: &str) -> IResult<&str, Node> {
 	)(input)
 }
 
+fn comment(input: &str) -> IResult<&str, &str> {
+	alt((multi_line_comment, single_line_comment))(input)
+}
+
+fn multi_line_comment(input: &str) -> IResult<&str, &str> {
+	delimited(tag("/*"), is_not("*/"), tag("*/"))(input)
+}
+
+fn single_line_comment(input: &str) -> IResult<&str, &str> {
+	delimited(tag("//"), is_not("\n"), tag("\n"))(input)
+}
+
 fn for_statement(input: &str) -> IResult<&str, Node> {
 	map(
 		tuple((
@@ -472,15 +498,17 @@ fn assigment_statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn statement(input: &str) -> IResult<&str, Node> {
-	alt((
-		user_statement,
-		special_statement,
-		assigment_statement,
-		if_statement,
-		for_statement,
-		loop_statement,
-		expression_statement,
-	))(input)
+	terminated(preceded(sp, 
+		alt((
+			user_statement,
+			special_statement,
+			assigment_statement,
+			if_statement,
+			for_statement,
+			loop_statement,
+			expression_statement,
+		))
+	), sp)(input)
 }
 
 fn program(input: &str) -> IResult<&str, Node> {

@@ -1,0 +1,7 @@
+/* x */ for(i=5) {
+	/* xx */ /* xx */
+	yield /* x */;
+	/* xx */ /* xx */
+	// single line comment
+	dump;
+}/*x */
