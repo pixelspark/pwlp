@@ -447,6 +447,9 @@ fn serve(config: Config, serve_matches: &ArgMatches) -> std::io::Result<()> {
 	if let Some(v) = serve_matches.value_of("bind") {
 		bind_address = v.to_string();
 	}
+	if let Some(v) = serve_matches.value_of("secret") {
+		global_secret = v.to_string();
+	}
 
 	let default_program = match default_program_path {
 		Some(path) => Program::from_file(&path).expect("error reading specified program file"),
