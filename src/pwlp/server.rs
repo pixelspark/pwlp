@@ -98,7 +98,7 @@ impl Server {
 									},
 									None => {
 										DeviceStatus {
-											address: source_address.clone(),
+											address: source_address,
 											last_seen: Instant::now()
 										}
 									}

@@ -100,7 +100,7 @@ impl Program {
 
 	fn skip<F>(&mut self, prefix: Prefix, mut builder: F) -> &mut Program
 	where
-		F: FnMut(&mut Program) -> (),
+		F: FnMut(&mut Program),
 	{
 		let mut fragment = Program {
 			code: Vec::<u8>::new(),
@@ -125,21 +125,21 @@ impl Program {
 
 	pub fn if_zero<F>(&mut self, builder: F) -> &mut Program
 	where
-		F: FnMut(&mut Program) -> (),
+		F: FnMut(&mut Program),
 	{
 		self.skip(Prefix::JNZ, builder)
 	}
 
 	pub fn if_not_zero<F>(&mut self, builder: F) -> &mut Program
 	where
-		F: FnMut(&mut Program) -> (),
+		F: FnMut(&mut Program),
 	{
 		self.skip(Prefix::JZ, builder)
 	}
 
 	pub fn repeat_forever<F>(&mut self, mut builder: F) -> &mut Program
 	where
-		F: FnMut(&mut Program) -> (),
+		F: FnMut(&mut Program),
 	{
 		let mut fragment = Program {
 			code: Vec::<u8>::new(),
@@ -168,7 +168,7 @@ impl Program {
 
 	pub fn repeat<F>(&mut self, mut builder: F) -> &mut Program
 	where
-		F: FnMut(&mut Program) -> (),
+		F: FnMut(&mut Program),
 	{
 		let mut fragment = Program {
 			code: Vec::<u8>::new(),
@@ -194,7 +194,7 @@ impl Program {
 
 	pub fn repeat_times<F>(&mut self, times: u32, builder: F) -> &mut Program
 	where
-		F: FnMut(&mut Program) -> (),
+		F: FnMut(&mut Program),
 	{
 		self.push(times);
 		self.repeat(builder);

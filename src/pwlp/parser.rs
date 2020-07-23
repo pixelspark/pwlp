@@ -2,7 +2,7 @@ use nom::{
 	branch::alt,
 	bytes::complete::{tag, take_while, take_while1, is_not},
 	combinator::{map, map_res, opt},
-	multi::{fold_many0, separated_list, many0},
+	multi::{fold_many0, separated_list},
 	sequence::{pair, preceded, terminated, tuple, delimited},
 	IResult,
 };
@@ -33,17 +33,17 @@ fn whitespace(input: &str) -> IResult<&str, &str> {
 }
 
 fn sp(input: &str) -> IResult<&str, ()> {
-	let mut i = input;
+	let mut input = input;
 	loop {
-		let (j, x) = whitespace(i)?;
+		let (j, x) = whitespace(input)?;
 		let (j, y) = opt(comment)(j)?;
 		let (j, z) = whitespace(j)?;
 		if x.is_empty() && y.is_none() && z.is_empty() {
 			break;
 		}
-		i = j;
+		input = j;
 	}
-	return Ok((i, ()));
+	Ok((input, ()))
 }
 
 fn hex_number(input: &str) -> IResult<&str, u32> {
