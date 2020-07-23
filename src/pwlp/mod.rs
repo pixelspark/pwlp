@@ -27,3 +27,6 @@ pub use server::*;
 
 pub mod client;
 pub use client::*;
+
+#[cfg(feature = "api")]
+pub mod api;

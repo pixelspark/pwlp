@@ -25,6 +25,8 @@ use rppal::spi;
 struct Config {
 	client: Option<ClientConfig>,
 	server: Option<ServerConfig>,
+	#[cfg(feature = "api")]
+	api: Option<pwlp::api::APIConfig>
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -44,7 +46,61 @@ struct ServerConfig {
 	devices: Option<HashMap<String, DeviceConfig>>,
 }
 
-fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
+	let mut serve_subcommand = SubCommand::with_name("serve")
+		.about("start server")
+		.arg(
+			Arg::with_name("bind")
+				.short("b")
+				.long("bind")
+				.value_name("0.0.0.0:33333")
+				.help("Address the server should listen at (overrides default key set in config)")
+				.takes_value(true),
+		)
+		.arg(
+			Arg::with_name("secret")
+				.short("s")
+				.long("secret")
+				.value_name("secret")
+				.help("Default HMAC-SHA1 key to use for signing messages when no device-specific key is configured (overrides default key set in config)")
+				.takes_value(true)
+		)
+		.arg(
+			Arg::with_name("program")
+				.short("p")
+				.long("program")
+				.value_name("program.bin")
+				.help("Default program to serve when no device-specific program has been set (overrides default program file name set in config)")
+				.takes_value(true)
+		)
+		.arg(
+			Arg::with_name("config")
+				.short("c")
+				.long("config")
+				.value_name("config.toml")
+				.help("Config file to read")
+				.takes_value(true),
+		);
+
+	#[cfg(feature = "api")]
+	{
+		serve_subcommand = serve_subcommand.arg(
+			Arg::with_name("no-api")
+				.long("no-api")
+				.help("Disables the HTTP API")
+				.takes_value(false)
+		);
+
+		serve_subcommand = serve_subcommand.arg(
+			Arg::with_name("bind-api")
+				.long("bind-api")
+				.value_name("127.0.0.1:33334")
+				.help("Address the HTTP API server should listen at (overrides default key set in config)")
+				.takes_value(true)
+		);
+	}
+
 	let matches = App::new("pwlp-server")
 		.version("1.0")
 		.about("Pixelspark wireless LED protocol server")
@@ -183,42 +239,7 @@ fn main() -> std::io::Result<()> {
 						.help("the maximum number of frames per second to execute (default = 60, 0 indicates no limit)")
 				),
 		)
-		.subcommand(
-			SubCommand::with_name("serve")
-				.about("start server")
-				.arg(
-					Arg::with_name("bind")
-						.short("b")
-						.long("bind")
-						.value_name("0.0.0.0:33333")
-						.help("Address the server should listen at (overrides default key set in config)")
-						.takes_value(true),
-				)
-				.arg(
-					Arg::with_name("secret")
-						.short("s")
-						.long("secret")
-						.value_name("secret")
-						.help("Default HMAC-SHA1 key to use for signing messages when no device-specific key is configured (overrides default key set in config)")
-						.takes_value(true)
-				)
-				.arg(
-					Arg::with_name("program")
-						.short("p")
-						.long("program")
-						.value_name("program.bin")
-						.help("Default program to serve when no device-specific program has been set (overrides default program file name set in config)")
-						.takes_value(true)
-				)
-				.arg(
-					Arg::with_name("config")
-						.short("c")
-						.long("config")
-						.value_name("config.toml")
-						.help("Config file to read")
-						.takes_value(true),
-				),
-		)
+		.subcommand(serve_subcommand)
 		.setting(AppSettings::ArgRequiredElseHelp)
 		.get_matches();
 
@@ -245,7 +266,7 @@ fn main() -> std::io::Result<()> {
 	} else if let Some(matches) = matches.subcommand_matches("disassemble") {
 		return disassemble(matches);
 	} else if let Some(matches) = matches.subcommand_matches("serve") {
-		return serve(config, matches);
+		return serve(config, matches).await;
 	};
 	Ok(())
 }
@@ -415,37 +436,73 @@ fn disassemble(matches: &ArgMatches) -> std::io::Result<()> {
 	Ok(())
 }
 
-fn serve(config: Config, serve_matches: &ArgMatches) -> std::io::Result<()> {
+async fn serve(config: Config, serve_matches: &ArgMatches<'_>) -> std::io::Result<()> {
+	let mut server = build_server(&config, serve_matches);
+	let state = server.state();
+
+	// Get bind address
+	let mut bind_address = String::from("0.0.0.0:33333");
+	if let Some(server_config) = &config.server {
+		if let Some(v) = server_config.bind_address.clone() {
+			bind_address = v;
+		}
+	}
+
+	if let Some(v) = serve_matches.value_of("bind") {
+		bind_address = v.to_string();
+	}
+
+	println!("PWLP server listening at {}", bind_address);
+	let server_task = tokio::task::spawn_blocking(move || {
+		match server.run(&bind_address) {
+			Ok(()) => (),
+			Err(t) => println!("PWLP server ended with error: {:?}", t)
+		}
+	});
+
+	#[cfg(feature = "api")]
+	{
+		let mut api_config = config.api.clone().unwrap_or_else(pwlp::api::APIConfig::new);
+
+		if let Some(v) = serve_matches.value_of("bind-api") {
+			api_config.bind_address = Some(v.to_string());
+		}
+
+		if serve_matches.is_present("no-api") {
+			api_config.enabled = false;
+		}
+
+		let (_, _) = tokio::join!(pwlp::api::serve_http(&api_config, state), server_task);
+	}
+
+	#[cfg(not(feature = "api"))]
+	tokio::join!(server_task);
+	Ok(())
+}
+
+fn build_server(config: &Config, serve_matches: &ArgMatches<'_>) -> Server {
 	let mut global_secret = String::from("secret");
 	let mut default_program_path: Option<String> = None;
-	let mut bind_address = String::from("0.0.0.0:33333");
 	let mut devices: HashMap<String, DeviceConfig> = HashMap::new();
 
 	// Read configured values
-	if let Some(server_config) = config.server {
-		if let Some(v) = server_config.secret {
-			global_secret = v;
+	if let Some(server_config) = &config.server {
+		if let Some(v) = &server_config.secret {
+			global_secret = v.clone();
 		}
 
-		if let Some(v) = server_config.program {
-			default_program_path = Some(v);
+		if let Some(v) = &server_config.program {
+			default_program_path = Some(v.clone());
 		}
 
-		if let Some(v) = server_config.bind_address {
-			bind_address = v;
-		}
-
-		if let Some(d) = server_config.devices {
-			devices = d;
+		if let Some(d) = &server_config.devices {
+			devices = d.clone();
 		}
 	}
 
 	// Read arguments
 	if let Some(v) = serve_matches.value_of("program") {
 		default_program_path = Some(v.to_string());
-	}
-	if let Some(v) = serve_matches.value_of("bind") {
-		bind_address = v.to_string();
 	}
 	if let Some(v) = serve_matches.value_of("secret") {
 		global_secret = v.to_string();
@@ -456,11 +513,7 @@ fn serve(config: Config, serve_matches: &ArgMatches) -> std::io::Result<()> {
 		None => default_serve_program(),
 	};
 
-	// Start server
-	let mut server = Server::new(devices, &global_secret, default_program);
-	println!("PWLP server listening at {}", bind_address);
-	server.run(&bind_address)?;
-	Ok(())
+	Server::new(devices, &global_secret, default_program)
 }
 
 fn vm_from_options(options: &ArgMatches) -> VM {

@@ -21,11 +21,24 @@ pub struct DeviceStatus {
 	last_seen: Instant
 }
 
+#[derive(Serialize)]
+pub struct ServerState {
+	device_state: HashMap<String, DeviceStatus>
+}
+
 pub struct Server {
 	devices: HashMap<String, DeviceConfig>,
-	status: Arc<Mutex<HashMap<String, DeviceStatus>>>,
+	state: Arc<Mutex<ServerState>>,
 	default_secret: String,
 	default_program: Program,
+}
+
+impl ServerState {
+	fn new() -> ServerState {
+		ServerState {
+			device_state: HashMap::new()
+		}
+	}
 }
 
 impl Server {
@@ -36,14 +49,14 @@ impl Server {
 	) -> Server {
 		Server {
 			devices,
-			status: Arc::new(Mutex::new(HashMap::new())),
+			state: Arc::new(Mutex::new(ServerState::new())),
 			default_secret: default_secret.to_string(),
 			default_program,
 		}
 	}
 
-	pub fn status(&mut self) -> Arc<Mutex<HashMap<String, DeviceStatus>>> {
-		self.status.clone()
+	pub fn state(&mut self) -> Arc<Mutex<ServerState>> {
+		self.state.clone()
 	}
 
 	pub fn run(&mut self, bind_address: &str) -> std::io::Result<()> {
@@ -91,8 +104,8 @@ impl Server {
 
 							// Update or create device status
 							{
-								let mut m = self.status.lock().unwrap();
-								let mut new_status = match m.get(&mac_identifier) {
+								let mut m = self.state.lock().unwrap();
+								let mut new_status = match m.device_state.get(&mac_identifier) {
 									Some(status) => {
 										(*status).clone()
 									},
@@ -105,7 +118,7 @@ impl Server {
 								};
 								new_status.last_seen = Instant::now();
 								println!("{} status: {:?}", &mac_identifier, &new_status);
-								m.insert(mac_identifier, new_status);
+								m.device_state.insert(mac_identifier, new_status);
 							}
 
 							match m.message_type {

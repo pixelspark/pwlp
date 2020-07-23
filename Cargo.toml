@@ -18,7 +18,10 @@ rand = "0.7.2"
 rppal = { version = "0.11.3", optional = true }
 rand_chacha = "0.2.1"
 mac_address = "1.0.3"
+tokio = { version = "0.2", features = ["macros"] }
+warp = { optional = true, version = "0.2.4" }
 
 [features]
-default = []
+default = ["api"]
 raspberrypi = ["rppal"]
+api = ["warp"]
