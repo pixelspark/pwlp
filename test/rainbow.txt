@@ -1,0 +1,19 @@
+/* Clear strip */
+for(i = get_length) {
+	set_pixel(i-1, 0, 0, 0);
+};
+blit;
+yield;
+
+loop {
+	for(color = 255) {
+		for(i = get_length) {
+			r = (color + i) & 0xFF;
+			g = (color + i + 0xC0) & 0xFF;
+			b = (color + i + 0xB0) & 0xFF;
+			set_pixel(i-1, r, g, b);
+		};
+		blit;
+		yield;
+	}
+}
