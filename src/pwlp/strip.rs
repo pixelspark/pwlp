@@ -80,11 +80,11 @@ pub mod spi_strip {
 	pub struct SPIStrip {
 		spi: Spi,
 		data: Vec<u8>,
-		length: u8,
+		length: u32,
 	}
 
 	impl SPIStrip {
-		pub fn new(spi: Spi, length: u8) -> SPIStrip {
+		pub fn new(spi: Spi, length: u32) -> SPIStrip {
 			SPIStrip {
 				spi,
 				length,
@@ -94,11 +94,11 @@ pub mod spi_strip {
 	}
 
 	impl super::Strip for SPIStrip {
-		fn length(&self) -> u8 {
+		fn length(&self) -> u32 {
 			self.length
 		}
 
-		fn get_pixel(&self, idx: u8) -> Color {
+		fn get_pixel(&self, idx: u32) -> Color {
 			assert!(
 				idx < self.length,
 				"get_pixel: index {} exceeds strip length {}",
@@ -112,7 +112,7 @@ pub mod spi_strip {
 			}
 		}
 
-		fn set_pixel(&mut self, idx: u8, r: u8, g: u8, b: u8) {
+		fn set_pixel(&mut self, idx: u32, r: u8, g: u8, b: u8) {
 			assert!(
 				idx < self.length,
 				"set_pixel: index {} exceeds strip length {}",
