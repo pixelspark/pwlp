@@ -130,6 +130,10 @@ impl Client {
 
 		// Strip thread
 		let mut program = initial_program;
+		if program.is_none() {
+			program = Some(rx.recv().unwrap());
+		}
+
 		loop {
 			let p = program;
 			program = None;
