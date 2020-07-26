@@ -236,8 +236,16 @@ async fn main() -> std::io::Result<()> {
 						.long("fps-limit")
 						.takes_value(true)
 						.value_name("60")
-						.help("the maximum number of frames per second to execute (default = 60, 0 indicates no limit)")
-				),
+						.help("the maximum number of frames per second to execute (default = 60, 0 indicates no limit)"))
+				.arg(Arg::with_name("initial")
+						.long("initial")
+						.takes_value(true)
+						.help("path to the initial program to run on start-up")
+					)
+					.arg(Arg::with_name("binary")
+						.long("binary")
+						.takes_value(false)
+						.help("interpret initial program file as binary"))
 		)
 		.subcommand(serve_subcommand)
 		.setting(AppSettings::ArgRequiredElseHelp)
@@ -306,6 +314,28 @@ fn client(config: Config, client_matches: &ArgMatches) -> std::io::Result<()> {
 	if let Some(v) = client_matches.value_of("fps-limit") {
 		fps_limit = Some(v.parse().unwrap());
 	}
+	
+	let initial_program = match client_matches.value_of("initial") {
+		Some(path) => {
+			// Interpret as binary?
+			let interpret_as_binary = client_matches.is_present("binary");
+			
+			if interpret_as_binary {
+				let mut source = Vec::<u8>::new();
+				File::open(path)?.read_to_end(&mut source)?;
+				Some(Program::from_binary(source))
+			} 
+			else {
+				let mut source = String::new();
+				File::open(path)?.read_to_string(&mut source)?;
+				match parse(&source) {
+					Ok(prg) => Some(prg),
+					Err(s) => panic!("Parsing default program failed: {}", s),
+				}
+			}
+		},
+		None => None
+	};
 
 	if fps_limit == Some(0) {
 		fps_limit = None;
@@ -314,7 +344,7 @@ fn client(config: Config, client_matches: &ArgMatches) -> std::io::Result<()> {
 	let vm = vm_from_options(&client_matches);
 	let mut client = Client::new(vm, &secret.as_bytes(), fps_limit);
 	client
-		.run(&bind_address, &server_address)
+		.run(&bind_address, &server_address, initial_program)
 		.expect("running the client failed");
 	Ok(())
 }
@@ -599,3 +629,4 @@ fn default_serve_program() -> Program {
 		});
 	program
 }
+ 
