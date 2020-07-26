@@ -1,0 +1,3 @@
+a=3;
+set_pixel(5, a+1, a, a);
+blit;

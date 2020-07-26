@@ -104,30 +104,27 @@ impl Node {
 				match s {
 					instructions::UserCommand::SET_PIXEL => {
 						let pre_level = scope.level;
+						let mut color_expression = Expression::Binary(Box::new(e[1].clone()), instructions::Binary::AND, Box::new(Expression::Literal(0xFF))); // Red
 
 						for (n, param) in e.iter().enumerate() {
-							if n == 0 {
-								// Index
-								param.assemble(program, scope);
-							}
-							else {
-								let mut old_level = scope.level;
-								param.assemble(program, scope);
-								program.push(0xFF);
-								program.binary(instructions::Binary::AND);
+							if n > 1 {
+								// (param & 0xFF)
+								let mut wrapped = Expression::Binary(Box::new(param.clone()), instructions::Binary::AND, Box::new(Expression::Literal(0xFF)));
 
+								// (param & 0xFF) << ((n-1)*8)
 								for _ in 0..(n-1) {
-									program.unary(instructions::Unary::SHL8);
+									wrapped = Expression::Unary(instructions::Unary::SHL8, Box::new(wrapped));
 								}
-
-								if n > 1 {
-									program.or();
-								} else {
-									old_level += 1
-								}
-								scope.level = old_level;
+								
+								// (color_expression | (param & 0xFF) << ((n-1)*8))
+								color_expression = Expression::Binary(Box::new(color_expression), instructions::Binary::OR, Box::new(wrapped));
 							}
 						}
+
+						// Index
+						e[0].assemble(program, scope);
+						scope.level = pre_level + 1;
+						color_expression.assemble(program, scope);
 						scope.level = pre_level;
 					}
 					_ => {
@@ -317,7 +314,7 @@ impl Expression {
 						});
 
 						program.leave_on_stack(2);
-						scope.level = old_level;
+						scope.level = old_level + 1;
 					}
 				}
 			}
