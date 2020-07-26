@@ -583,7 +583,7 @@ fn vm_from_options(options: &ArgMatches) -> VM {
 				None => spi::SlaveSelect::Ss0,
 			};
 
-			let spi = spi::Spi::new(spi_bus, ss, 2_000_000, spi::Mode::Mode0)
+			let spi = spi::Spi::new(spi_bus, ss, 1_000_000, spi::Mode::Mode0)
 				.expect("spi bus could not be created");
 			let strip = strip::spi_strip::SPIStrip::new(spi, length);
 			vm = VM::new(Box::new(strip));
