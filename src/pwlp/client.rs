@@ -70,15 +70,16 @@ impl Client {
 					.expect("message construction failed");
 				let signed = welcome.signed(&secret);
 				println!("Sending welcome to server {}", server_address);
-				socket
-					.send_to(&signed, &server_address)
-					.expect("send_to failed");
+				match socket.send_to(&signed, &server_address) {
+					Err(x) => println!("failed to send welcome: {}", x),
+					Ok(_) => {}
+				}
 
 				while SystemTime::now().duration_since(last_ping_time).unwrap() < ping_interval {
 					let mut buf = [0; 1500];
 					match socket.recv_from(&mut buf) {
 						Ok((amt, source_address)) => {
-							println!("Received {} from {}", amt, source_address);
+							println!("Received {} bytes from {}", amt, source_address);
 
 							// Decode message (from_buffer verifies HMAC)
 							match Message::from_buffer(&buf[0..amt], &secret) {
@@ -115,7 +116,8 @@ impl Client {
 						}
 						Err(e) => {
 							if e.kind() != std::io::ErrorKind::WouldBlock {
-								panic!(e)
+								println!("could not receive from socket: {}. Sleeping for 1s", e);
+								std::thread::sleep(std::time::Duration::from_secs(1));
 							} else {
 								// Time-out, which is expected
 							}
