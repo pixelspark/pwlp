@@ -119,15 +119,16 @@ impl<'a> State<'a> {
 				if self.stack.is_empty() {
 					return Some(Outcome::Error(VMError::StackUnderflow));
 				}
-				let v = self.stack.last().unwrap();
-				let idx = (v & 0xFF) as u8;
-				let r = (((v >> 8) as u32) & 0xFF) as u8;
-				let g = (((v >> 16) as u32) & 0xFF) as u8;
-				let b = (((v >> 24) as u32) & 0xFF) as u8;
+				let v = self.stack.pop().unwrap();
+				let r = (((v >> 0) as u32) & 0xFF) as u8;
+				let g = (((v >> 8) as u32) & 0xFF) as u8;
+				let b = (((v >> 16) as u32) & 0xFF) as u8;
+				let idx = self.stack.last().unwrap();
+
 				if self.vm.trace {
 					print!("\tset_pixel {} idx={} r={} g={}, b={}", v, idx, r, g, b);
 				}
-				self.vm.strip.set_pixel(idx, r, g, b);
+				self.vm.strip.set_pixel(*idx, r, g, b);
 				None
 			}
 			Some(UserCommand::BLIT) => {
@@ -150,7 +151,7 @@ impl<'a> State<'a> {
 					return Some(Outcome::Error(VMError::StackUnderflow));
 				}
 				let v = self.stack.pop().unwrap();
-				let color = self.vm.strip.get_pixel((v & 0xFF) as u8);
+				let color = self.vm.strip.get_pixel(v);
 				let color_value = (v & 0xFF)
 					| (color.r as u32) << 8
 					| (color.g as u32) << 16

@@ -1,2 +1,2 @@
-set_pixel(0x05|0xCC00);
+set_pixel(5, 0xCCC, 0, 0);
 blit;

@@ -5,20 +5,20 @@ pub struct Color {
 }
 
 pub trait Strip {
-	fn length(&self) -> u8;
+	fn length(&self) -> u32;
 	fn blit(&mut self);
-	fn set_pixel(&mut self, idx: u8, r: u8, g: u8, b: u8);
-	fn get_pixel(&self, idx: u8) -> Color;
+	fn set_pixel(&mut self, idx: u32, r: u8, g: u8, b: u8);
+	fn get_pixel(&self, idx: u32) -> Color;
 }
 
 pub struct DummyStrip {
 	trace: bool,
-	length: u8,
+	length: u32,
 	data: Vec<u8>,
 }
 
 impl DummyStrip {
-	pub fn new(length: u8, trace: bool) -> DummyStrip {
+	pub fn new(length: u32, trace: bool) -> DummyStrip {
 		DummyStrip {
 			trace,
 			length,
@@ -28,11 +28,11 @@ impl DummyStrip {
 }
 
 impl Strip for DummyStrip {
-	fn length(&self) -> u8 {
+	fn length(&self) -> u32 {
 		self.length
 	}
 
-	fn set_pixel(&mut self, idx: u8, r: u8, g: u8, b: u8) {
+	fn set_pixel(&mut self, idx: u32, r: u8, g: u8, b: u8) {
 		assert!(
 			idx < self.length,
 			"set_pixel: index {} exceeds strip length {}",
@@ -44,7 +44,7 @@ impl Strip for DummyStrip {
 		self.data[(idx as usize) * 3 + 2] = b;
 	}
 
-	fn get_pixel(&self, idx: u8) -> Color {
+	fn get_pixel(&self, idx: u32) -> Color {
 		assert!(
 			idx < self.length,
 			"get_pixel: index {} exceeds strip length {}",

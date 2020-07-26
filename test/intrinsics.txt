@@ -1,4 +1,3 @@
-a=irgb(0x03<<1,0xBB,0xCC,0xDD);
-b=index(a)|(red(a)<<8)|(green(a)<<16)|(blue(a)<<24);
-set_pixel(a);
+a=rgb(0xBB,0xCC,0xDD);
+set_pixel(0x03<<1, red(a), green(a), blue(a));
 blit;

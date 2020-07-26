@@ -104,19 +104,29 @@ impl Node {
 				match s {
 					instructions::UserCommand::SET_PIXEL => {
 						let pre_level = scope.level;
-						for (n, param) in e.iter().enumerate() {
-							let mut old_level = scope.level;
-							param.assemble(program, scope);
-							for _ in 0..n {
-								program.unary(instructions::Unary::SHL8);
-							}
 
-							if n > 0 {
-								program.or();
-							} else {
-								old_level += 1
+						for (n, param) in e.iter().enumerate() {
+							if n == 0 {
+								// Index
+								param.assemble(program, scope);
 							}
-							scope.level = old_level;
+							else {
+								let mut old_level = scope.level;
+								param.assemble(program, scope);
+								program.push(0xFF);
+								program.binary(instructions::Binary::AND);
+
+								for _ in 0..(n-1) {
+									program.unary(instructions::Unary::SHL8);
+								}
+
+								if n > 1 {
+									program.or();
+								} else {
+									old_level += 1
+								}
+								scope.level = old_level;
+							}
 						}
 						scope.level = pre_level;
 					}

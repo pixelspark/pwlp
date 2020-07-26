@@ -248,9 +248,6 @@ fn special_statement(input: &str) -> IResult<&str, Node> {
 fn user_statement(input: &str) -> IResult<&str, Node> {
 	alt((
 		map(tag("blit"), |_| Node::User(instructions::UserCommand::BLIT)),
-		map(tuple((tag("set_pixel("), expression, tag(")"))), |t| {
-			Node::UserCall(instructions::UserCommand::SET_PIXEL, vec![t.1])
-		}),
 		// set_pixel(i, r, g, b)
 		map(
 			tuple((
@@ -292,12 +289,10 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 			Expression::User(instructions::UserCommand::GET_PRECISE_TIME)
 		}),
 		/* Compiler intrinsics: 'functions' that simply compile to an expression  */
-		// irgb(i, r, g, b) => color value (0xBBGGRRII)
+		// rgb(r, g, b) => color value (0xBBGGRRII)
 		map(
 			tuple((
-				tag("irgb("),
-				preceded(sp, terminated(expression, sp)),
-				tag(","),
+				tag("rgb("),
 				preceded(sp, terminated(expression, sp)),
 				tag(","),
 				preceded(sp, terminated(expression, sp)),
@@ -306,8 +301,8 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 				tag(")"),
 			)),
 			|t| {
-				// (i & 0xFF) | (r & 0xFF) << 8 | (g & 0xFF) << 16 | (b & 0xFF) << 24
-				let vals = vec![t.3, t.5, t.7];
+				// (r & 0xFF) | (g & 0xFF) << 8 | (b & 0xFF) << 16
+				let vals = vec![t.3, t.5];
 				let mut shift: u32 = 8;
 				let mut root: Box<Expression> = Box::new(Expression::Binary(
 					Box::new(t.1),
@@ -334,7 +329,7 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 				*root
 			},
 		),
-		// clamp(value, min, max): 
+		// clamp(value, min, max):
 		map(
 			tuple((
 				tag("clamp("),
@@ -349,16 +344,16 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 				Expression::Intrinsic(Intrinsic::Clamp(Box::new(t.1), Box::new(t.3), Box::new(t.5)))
 			},
 		),
-		// index(color value) => index (i.e. 0xBBGGRRII => 0xII)
-		map(tuple((tag("index("), expression, tag(")"))), |t| {
-			// x & 0xFF
+		//red(color)
+		map(tuple((tag("red("), expression, tag(")"))), |t| {
+			// x 0xFF
 			Expression::Binary(
 				Box::new(t.1),
 				instructions::Binary::AND,
 				Box::new(Expression::Literal(0xFF))
 			)
 		}),
-		map(tuple((tag("red("), expression, tag(")"))), |t| {
+		map(tuple((tag("green("), expression, tag(")"))), |t| {
 			// (x >> 8) & 0xFF
 			Expression::Binary(
 				Box::new(Expression::Unary(
@@ -369,7 +364,7 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 				Box::new(Expression::Literal(0xFF))
 			)
 		}),
-		map(tuple((tag("green("), expression, tag(")"))), |t| {
+		map(tuple((tag("blue("), expression, tag(")"))), |t| {
 			// (x >> 16) & 0xFF
 			Expression::Binary(
 				Box::new(Expression::Unary(
@@ -377,23 +372,6 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 					Box::new(Expression::Unary(
 						instructions::Unary::SHR8,
 						Box::new(t.1)
-					))
-				)),
-				instructions::Binary::AND,
-				Box::new(Expression::Literal(0xFF))
-			)
-		}),
-		map(tuple((tag("blue("), expression, tag(")"))), |t| {
-			// (x >> 24) & 0xFF
-			Expression::Binary(
-				Box::new(Expression::Unary(
-					instructions::Unary::SHR8,
-					Box::new(Expression::Unary(
-						instructions::Unary::SHR8,
-						Box::new(Expression::Unary(
-							instructions::Unary::SHR8,
-							Box::new(t.1)
-						))
 					))
 				)),
 				instructions::Binary::AND,

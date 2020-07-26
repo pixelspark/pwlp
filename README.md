@@ -76,19 +76,17 @@ Consecutive statements are separated by ";". Supported constructs:
 * Special commands:
   * `yield`
 * User commands:
-  * `set_pixel(value)`: sets a pixel (the integer is formatted as 0xBBGGRRII)
-  * `get_pixel(index)`: gets the current value for a pixel (may not be blitted yet); formatted as 0xBBGGRRII
-  * `set_pixel(i, r, g, b)`: equivalent to `set_pixel(i | r<<8 | g<<16 | b<<24)`
+  * `get_pixel(index)`: gets the current value for a pixel (may not be blitted yet); formatted as 0x00BBGGRR
+  * `set_pixel(i, r, g, b)`: set pixel at index `i` to color `(r, g, b)`
   * `random(max)`: return a random number between zero and `max`, inclusive
   * `get_length`: returns the length of the strip
   * `get_precise_time`: returns a monotonic time in milliseconds. In deterministic mode, uses the number of instructions to return an approximate time.
   * `get_wall_time`: returns the number of seconds elapsed since the Unix epoch time (possibly wrapping around in the future!).
 * Compiler intrinsics:
-  * `irgb(i, r, g, b)` translates to `(i & 0xFF) | (r & 0xFF) << 8 | (g & 0xFF) << 16 | (b & 0xFF) << 24`
-  * `red(c)` translates to `(c >> 8) & 0xFF`
-  * `green(c)` translates to `(c >> 16) & 0xFF`
-  * `blue(c)` translates to `(c >> 24) & 0xFF`
-  * `index(c)` translates to `c & 0xFF`
+  * `rgb(r, g, b)` translates to `(r & 0xFF) | (g & 0xFF) << 8 | (b & 0xFF) << 16`
+  * `red(c)` translates to `c & 0xFF`
+  * `green(c)` translates to `(c >> 8) & 0xFF`
+  * `blue(c)` translates to `(c >> 16) & 0xFF`
 
 ### Expressions
 

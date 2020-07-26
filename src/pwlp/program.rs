@@ -91,7 +91,7 @@ impl Program {
 			UserCommand::GET_PRECISE_TIME => 1,
 			UserCommand::GET_WALL_TIME => 1,
 			UserCommand::BLIT => 0,
-			UserCommand::SET_PIXEL => 0,
+			UserCommand::SET_PIXEL => -1,
 			UserCommand::RANDOM_INT => 0,
 			UserCommand::GET_PIXEL => 0,
 		};

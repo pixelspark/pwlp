@@ -520,8 +520,8 @@ fn vm_from_options(options: &ArgMatches) -> VM {
 	let length = options
 		.value_of("length")
 		.unwrap_or("10")
-		.parse::<u8>()
-		.expect("length must be between 1..255");
+		.parse::<u32>()
+		.expect("length must be >0");
 
 	if length == 0 {
 		panic!("length cannot be zero");
