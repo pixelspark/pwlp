@@ -23,7 +23,7 @@ pub struct DeviceStatus {
 
 #[derive(Serialize)]
 pub struct ServerState {
-	device_state: HashMap<String, DeviceStatus>
+	pub devices: HashMap<String, DeviceStatus>
 }
 
 pub struct Server {
@@ -36,7 +36,7 @@ pub struct Server {
 impl ServerState {
 	fn new() -> ServerState {
 		ServerState {
-			device_state: HashMap::new()
+			devices: HashMap::new()
 		}
 	}
 }
@@ -105,7 +105,7 @@ impl Server {
 							// Update or create device status
 							{
 								let mut m = self.state.lock().unwrap();
-								let mut new_status = match m.device_state.get(&mac_identifier) {
+								let mut new_status = match m.devices.get(&mac_identifier) {
 									Some(status) => {
 										(*status).clone()
 									},
@@ -118,7 +118,7 @@ impl Server {
 								};
 								new_status.last_seen = Instant::now();
 								println!("{} status: {:?}", &mac_identifier, &new_status);
-								m.device_state.insert(mac_identifier, new_status);
+								m.devices.insert(mac_identifier, new_status);
 							}
 
 							match m.message_type {

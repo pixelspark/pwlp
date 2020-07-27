@@ -1,9 +1,10 @@
 
 use warp::{Filter,Reply, Rejection};
-use super::server::ServerState;
+use super::server::{ServerState, DeviceStatus};
 use std::sync::Mutex;
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -23,14 +24,14 @@ impl APIConfig {
 
 #[derive(Serialize)]
 pub struct IndexReply<'a> {
-	state: &'a ServerState
+	devices: &'a HashMap<String, DeviceStatus>
 }
 
 async fn get_index(state: Arc<Mutex<ServerState>>) -> Result<Box<dyn Reply>, Rejection> {
 	let s = state.lock().unwrap();
 	let sa = &(*s);
 	Ok(Box::new(warp::reply::json(&IndexReply {
-		state: sa
+		devices: &sa.devices
 	})))
 }
 
