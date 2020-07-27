@@ -593,36 +593,5 @@ fn vm_from_options(options: &ArgMatches) -> VM {
 }
 
 fn default_serve_program() -> Program {
-	// Use a hardcoded default program
-	let mut program = Program::new();
-	program
-		.push(0) // let counter = 0
-		.repeat_forever(|p| {
-			// while(true)
-			p.inc() // counter++
-				.get_length() // let length = get_length()
-				.r#mod() // counter % length
-				.get_length() // let led_counter = get_length()
-				.repeat(|q| {
-					// while(--led_counter)
-					q.dup()
-						.peek(2)
-						.lte() // led_counter <= length
-						.if_zero(|r| {
-							r.peek(1)
-								.push(0xFF_00_00_00)
-								.or() // led_value = 0xFF000000 | led_counter
-								.set_pixel() // set_pixel(led_value)
-								.pop(1);
-						})
-						.if_not_zero(|r| {
-							r.peek(1).push(0x00_FF_00_00).or().set_pixel().pop(1);
-						})
-						.pop(1);
-				})
-				.blit()
-				.pop(1)
-				.r#yield();
-		});
-	program
+	parse(include_str!("../test/blink.txt")).unwrap()
 }
