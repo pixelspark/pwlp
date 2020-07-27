@@ -1,9 +1,9 @@
 use nom::{
 	branch::alt,
-	bytes::complete::{tag, take_while, take_while1, is_not},
+	bytes::complete::{is_not, tag, take_while, take_while1},
 	combinator::{map, map_res, opt},
 	multi::{fold_many0, separated_list},
-	sequence::{pair, preceded, terminated, tuple, delimited},
+	sequence::{delimited, pair, preceded, terminated, tuple},
 	IResult,
 };
 
@@ -162,8 +162,8 @@ fn addition(input: &str) -> IResult<&str, Expression> {
 
 	fold_many0(
 		pair(
-			terminated(preceded(sp, alt((tag("+"), tag("-")))), sp), 
-			multiplication
+			terminated(preceded(sp, alt((tag("+"), tag("-")))), sp),
+			multiplication,
 		),
 		init,
 		|acc, (op, val): (&str, Expression)| {
@@ -307,7 +307,7 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 				let mut root: Box<Expression> = Box::new(Expression::Binary(
 					Box::new(t.1),
 					instructions::Binary::AND,
-					Box::new(Expression::Literal(0xFF))
+					Box::new(Expression::Literal(0xFF)),
 				));
 
 				for val in vals {
@@ -318,11 +318,11 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 							Box::new(Expression::Binary(
 								Box::new(val),
 								instructions::Binary::AND,
-								Box::new(Expression::Literal(0xFF))
+								Box::new(Expression::Literal(0xFF)),
 							)),
 							instructions::Binary::SHL,
-							Box::new(Expression::Literal(shift))
-						))
+							Box::new(Expression::Literal(shift)),
+						)),
 					));
 					shift += 8;
 				}
@@ -341,7 +341,11 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 				tag(")"),
 			)),
 			|t| {
-				Expression::Intrinsic(Intrinsic::Clamp(Box::new(t.1), Box::new(t.3), Box::new(t.5)))
+				Expression::Intrinsic(Intrinsic::Clamp(
+					Box::new(t.1),
+					Box::new(t.3),
+					Box::new(t.5),
+				))
 			},
 		),
 		//red(color)
@@ -350,18 +354,15 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 			Expression::Binary(
 				Box::new(t.1),
 				instructions::Binary::AND,
-				Box::new(Expression::Literal(0xFF))
+				Box::new(Expression::Literal(0xFF)),
 			)
 		}),
 		map(tuple((tag("green("), expression, tag(")"))), |t| {
 			// (x >> 8) & 0xFF
 			Expression::Binary(
-				Box::new(Expression::Unary(
-					instructions::Unary::SHR8,
-					Box::new(t.1)
-				)),
+				Box::new(Expression::Unary(instructions::Unary::SHR8, Box::new(t.1))),
 				instructions::Binary::AND,
-				Box::new(Expression::Literal(0xFF))
+				Box::new(Expression::Literal(0xFF)),
 			)
 		}),
 		map(tuple((tag("blue("), expression, tag(")"))), |t| {
@@ -369,13 +370,10 @@ fn user_expression(input: &str) -> IResult<&str, Expression> {
 			Expression::Binary(
 				Box::new(Expression::Unary(
 					instructions::Unary::SHR8,
-					Box::new(Expression::Unary(
-						instructions::Unary::SHR8,
-						Box::new(t.1)
-					))
+					Box::new(Expression::Unary(instructions::Unary::SHR8, Box::new(t.1))),
 				)),
 				instructions::Binary::AND,
-				Box::new(Expression::Literal(0xFF))
+				Box::new(Expression::Literal(0xFF)),
 			)
 		}),
 	))(input)
@@ -476,17 +474,21 @@ fn assigment_statement(input: &str) -> IResult<&str, Node> {
 }
 
 fn statement(input: &str) -> IResult<&str, Node> {
-	terminated(preceded(sp, 
-		alt((
-			user_statement,
-			special_statement,
-			assigment_statement,
-			if_statement,
-			for_statement,
-			loop_statement,
-			expression_statement,
-		))
-	), sp)(input)
+	terminated(
+		preceded(
+			sp,
+			alt((
+				user_statement,
+				special_statement,
+				assigment_statement,
+				if_statement,
+				for_statement,
+				loop_statement,
+				expression_statement,
+			)),
+		),
+		sp,
+	)(input)
 }
 
 fn program(input: &str) -> IResult<&str, Node> {

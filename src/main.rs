@@ -26,7 +26,7 @@ struct Config {
 	client: Option<ClientConfig>,
 	server: Option<ServerConfig>,
 	#[cfg(feature = "api")]
-	api: Option<pwlp::api::APIConfig>
+	api: Option<pwlp::api::APIConfig>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -89,7 +89,7 @@ async fn main() -> std::io::Result<()> {
 			Arg::with_name("no-api")
 				.long("no-api")
 				.help("Disables the HTTP API")
-				.takes_value(false)
+				.takes_value(false),
 		);
 
 		serve_subcommand = serve_subcommand.arg(
@@ -257,7 +257,7 @@ async fn main() -> std::io::Result<()> {
 	match File::open(config_file) {
 		Ok(mut config_opened) => {
 			config_opened.read_to_string(&mut config_string)?;
-		},
+		}
 		Err(e) => {
 			println!("failed to open configuration file: {:?}", e);
 		}
@@ -314,18 +314,17 @@ fn client(config: Config, client_matches: &ArgMatches) -> std::io::Result<()> {
 	if let Some(v) = client_matches.value_of("fps-limit") {
 		fps_limit = Some(v.parse().unwrap());
 	}
-	
+
 	let initial_program = match client_matches.value_of("initial") {
 		Some(path) => {
 			// Interpret as binary?
 			let interpret_as_binary = client_matches.is_present("binary");
-			
+
 			if interpret_as_binary {
 				let mut source = Vec::<u8>::new();
 				File::open(path)?.read_to_end(&mut source)?;
 				Some(Program::from_binary(source))
-			} 
-			else {
+			} else {
 				let mut source = String::new();
 				File::open(path)?.read_to_string(&mut source)?;
 				match parse(&source) {
@@ -333,8 +332,8 @@ fn client(config: Config, client_matches: &ArgMatches) -> std::io::Result<()> {
 					Err(s) => panic!("Parsing default program failed: {}", s),
 				}
 			}
-		},
-		None => None
+		}
+		None => None,
 	};
 
 	if fps_limit == Some(0) {
@@ -483,11 +482,9 @@ async fn serve(config: Config, serve_matches: &ArgMatches<'_>) -> std::io::Resul
 	}
 
 	println!("PWLP server listening at {}", bind_address);
-	let server_task = tokio::task::spawn_blocking(move || {
-		match server.run(&bind_address) {
-			Ok(()) => (),
-			Err(t) => println!("PWLP server ended with error: {:?}", t)
-		}
+	let server_task = tokio::task::spawn_blocking(move || match server.run(&bind_address) {
+		Ok(()) => (),
+		Err(t) => println!("PWLP server ended with error: {:?}", t),
 	});
 
 	#[cfg(feature = "api")]
@@ -629,4 +626,3 @@ fn default_serve_program() -> Program {
 		});
 	program
 }
- 

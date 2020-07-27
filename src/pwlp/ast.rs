@@ -104,20 +104,35 @@ impl Node {
 				match s {
 					instructions::UserCommand::SET_PIXEL => {
 						let pre_level = scope.level;
-						let mut color_expression = Expression::Binary(Box::new(e[1].clone()), instructions::Binary::AND, Box::new(Expression::Literal(0xFF))); // Red
+						let mut color_expression = Expression::Binary(
+							Box::new(e[1].clone()),
+							instructions::Binary::AND,
+							Box::new(Expression::Literal(0xFF)),
+						); // Red
 
 						for (n, param) in e.iter().enumerate() {
 							if n > 1 {
 								// (param & 0xFF)
-								let mut wrapped = Expression::Binary(Box::new(param.clone()), instructions::Binary::AND, Box::new(Expression::Literal(0xFF)));
+								let mut wrapped = Expression::Binary(
+									Box::new(param.clone()),
+									instructions::Binary::AND,
+									Box::new(Expression::Literal(0xFF)),
+								);
 
 								// (param & 0xFF) << ((n-1)*8)
-								for _ in 0..(n-1) {
-									wrapped = Expression::Unary(instructions::Unary::SHL8, Box::new(wrapped));
+								for _ in 0..(n - 1) {
+									wrapped = Expression::Unary(
+										instructions::Unary::SHL8,
+										Box::new(wrapped),
+									);
 								}
-								
+
 								// (color_expression | (param & 0xFF) << ((n-1)*8))
-								color_expression = Expression::Binary(Box::new(color_expression), instructions::Binary::OR, Box::new(wrapped));
+								color_expression = Expression::Binary(
+									Box::new(color_expression),
+									instructions::Binary::OR,
+									Box::new(wrapped),
+								);
 							}
 						}
 

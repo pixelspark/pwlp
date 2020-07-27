@@ -35,7 +35,12 @@ impl Client {
 		}
 	}
 
-	pub fn run(&mut self, bind_address: &str, server_address: &str, initial_program: Option<Program>) -> Result<(), Box<dyn Error>> {
+	pub fn run(
+		&mut self,
+		bind_address: &str,
+		server_address: &str,
+		initial_program: Option<Program>,
+	) -> Result<(), Box<dyn Error>> {
 		// Set everything to the same color
 		self.vm.strip().set_all_pixels_to(0, 0, 0);
 
