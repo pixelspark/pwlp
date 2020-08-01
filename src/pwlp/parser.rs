@@ -507,23 +507,25 @@ fn program(input: &str) -> IResult<&str, Node> {
 	)(input)
 }
 
-pub fn parse(source: &str) -> Result<Program, String> {
-	match program(source) {
-		Ok((remainder, n)) => {
-			if remainder != "" {
-				let err_string = format!("Could not parse, remainder: {}", remainder);
-				Err(err_string)
-			} else {
-				let mut p = Program::new();
-				let mut scope = Scope::new();
-				n.assemble(&mut p, &mut scope);
-				scope.assemble_teardown(&mut p);
-				Ok(p)
+impl Program {
+	pub fn from_source(source: &str) -> Result<Program, String> {
+		match program(source) {
+			Ok((remainder, n)) => {
+				if remainder != "" {
+					let err_string = format!("Could not parse, remainder: {}", remainder);
+					Err(err_string)
+				} else {
+					let mut p = Program::new();
+					let mut scope = Scope::new();
+					n.assemble(&mut p, &mut scope);
+					scope.assemble_teardown(&mut p);
+					Ok(p)
+				}
 			}
-		}
-		Err(x) => {
-			let err_string = format!("Parser error: {:?}", x);
-			Err(err_string)
+			Err(x) => {
+				let err_string = format!("Parser error: {:?}", x);
+				Err(err_string)
+			}
 		}
 	}
 }

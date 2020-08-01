@@ -4,7 +4,6 @@ extern crate clap;
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use pwlp::client::Client;
-use pwlp::parser::parse;
 use pwlp::program::Program;
 use pwlp::server::{DeviceConfig, Server};
 use pwlp::strip;
@@ -48,6 +47,8 @@ struct ServerConfig {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+	env_logger::init();
+
 	let mut serve_subcommand = SubCommand::with_name("serve")
 		.about("start server")
 		.arg(
@@ -259,7 +260,7 @@ async fn main() -> std::io::Result<()> {
 			config_opened.read_to_string(&mut config_string)?;
 		}
 		Err(e) => {
-			println!("failed to open configuration file: {:?}", e);
+			log::warn!("failed to open configuration file: {:?}", e);
 		}
 	}
 	let config: Config = toml::from_str(&config_string)?;
@@ -327,7 +328,7 @@ fn client(config: Config, client_matches: &ArgMatches) -> std::io::Result<()> {
 			} else {
 				let mut source = String::new();
 				File::open(path)?.read_to_string(&mut source)?;
-				match parse(&source) {
+				match Program::from_source(&source) {
 					Ok(prg) => Some(prg),
 					Err(s) => panic!("Parsing default program failed: {}", s),
 				}
@@ -366,7 +367,7 @@ fn run(run_matches: &ArgMatches) -> std::io::Result<()> {
 		} else {
 			stdin().read_to_string(&mut source)?;
 		}
-		match parse(&source) {
+		match Program::from_source(&source) {
 			Ok(prg) => prg,
 			Err(s) => panic!("Parsing failed: {}", s),
 		}
@@ -438,7 +439,7 @@ fn compile(matches: &ArgMatches) -> std::io::Result<()> {
 		stdin().read_to_string(&mut source)?;
 	}
 
-	match parse(&source) {
+	match Program::from_source(&source) {
 		Ok(prg) => {
 			if !matches.is_present("output") {
 				println!("Program:\n{:?}", &prg);
@@ -466,25 +467,12 @@ fn disassemble(matches: &ArgMatches) -> std::io::Result<()> {
 }
 
 async fn serve(config: Config, serve_matches: &ArgMatches<'_>) -> std::io::Result<()> {
-	let mut server = build_server(&config, serve_matches);
+	let mut server = build_server(&config, serve_matches)?;
 	let state = server.state();
 
-	// Get bind address
-	let mut bind_address = String::from("0.0.0.0:33333");
-	if let Some(server_config) = &config.server {
-		if let Some(v) = server_config.bind_address.clone() {
-			bind_address = v;
-		}
-	}
-
-	if let Some(v) = serve_matches.value_of("bind") {
-		bind_address = v.to_string();
-	}
-
-	println!("PWLP server listening at {}", bind_address);
-	let server_task = tokio::task::spawn_blocking(move || match server.run(&bind_address) {
+	let server_task = tokio::task::spawn_blocking(move || match server.run() {
 		Ok(()) => (),
-		Err(t) => println!("PWLP server ended with error: {:?}", t),
+		Err(t) => log::error!("PWLP server ended with error: {:?}", t),
 	});
 
 	#[cfg(feature = "api")]
@@ -507,10 +495,11 @@ async fn serve(config: Config, serve_matches: &ArgMatches<'_>) -> std::io::Resul
 	Ok(())
 }
 
-fn build_server(config: &Config, serve_matches: &ArgMatches<'_>) -> Server {
+fn build_server(config: &Config, serve_matches: &ArgMatches<'_>) -> std::io::Result<Server> {
 	let mut global_secret = String::from("secret");
 	let mut default_program_path: Option<String> = None;
 	let mut devices: HashMap<String, DeviceConfig> = HashMap::new();
+	let mut bind_address = String::from("0.0.0.0:33333");
 
 	// Read configured values
 	if let Some(server_config) = &config.server {
@@ -525,7 +514,13 @@ fn build_server(config: &Config, serve_matches: &ArgMatches<'_>) -> Server {
 		if let Some(d) = &server_config.devices {
 			devices = d.clone();
 		}
+
+		if let Some(v) = server_config.bind_address.clone() {
+			bind_address = v;
+		}
 	}
+
+	log::info!("PWLP will listen at {}", bind_address);
 
 	// Read arguments
 	if let Some(v) = serve_matches.value_of("program") {
@@ -540,7 +535,7 @@ fn build_server(config: &Config, serve_matches: &ArgMatches<'_>) -> Server {
 		None => default_serve_program(),
 	};
 
-	Server::new(devices, &global_secret, default_program)
+	Server::new(devices, &global_secret, default_program, &bind_address)
 }
 
 fn vm_from_options(options: &ArgMatches) -> VM {
@@ -593,5 +588,5 @@ fn vm_from_options(options: &ArgMatches) -> VM {
 }
 
 fn default_serve_program() -> Program {
-	parse(include_str!("../test/blink.txt")).unwrap()
+	Program::from_source(include_str!("../test/blink.txt")).unwrap()
 }

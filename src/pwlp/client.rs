@@ -52,14 +52,14 @@ impl Client {
 		let secret = self.secret.to_owned();
 		let bind_address = bind_address.to_owned();
 		let server_address = server_address.to_owned();
-		println!(
+		log::info!(
 			"Running as client with MAC {} at {} with server {}",
 			mac_address, bind_address, server_address
 		);
 		let (tx, rx) = mpsc::channel();
 
 		thread::spawn(move || {
-			println!("Client binding to address {}", bind_address);
+			log::info!("Client binding to address {}", bind_address);
 			let socket = UdpSocket::bind(bind_address).expect("could not bind to address");
 
 			socket
@@ -74,9 +74,9 @@ impl Client {
 				let welcome = Message::new(MessageType::Ping, mac_address, None)
 					.expect("message construction failed");
 				let signed = welcome.signed(&secret);
-				println!("Sending welcome to server {}", server_address);
+				log::info!("Sending welcome to server {}", server_address);
 				match socket.send_to(&signed, &server_address) {
-					Err(x) => println!("failed to send welcome: {}", x),
+					Err(x) => log::error!("failed to send welcome: {}", x),
 					Ok(_) => {}
 				}
 
@@ -84,16 +84,16 @@ impl Client {
 					let mut buf = [0; 1500];
 					match socket.recv_from(&mut buf) {
 						Ok((amt, source_address)) => {
-							println!("Received {} bytes from {}", amt, source_address);
+							log::info!("Received {} bytes from {}", amt, source_address);
 
 							// Decode message (from_buffer verifies HMAC)
 							match Message::from_buffer(&buf[0..amt], &secret) {
-								Err(t) => println!(
+								Err(t) => log::error!(
 									"{} error {:?} (size={}b secret={:?})",
 									source_address, t, amt, secret
 								),
 								Ok(m) => {
-									println!(
+									log::info!(
 										"{}: {:?} t={}",
 										source_address, m.message_type, m.unix_time
 									);
@@ -113,7 +113,7 @@ impl Client {
 										| MessageType::Set
 										| MessageType::Unknown => {
 											// Ignore
-											println!("Ignoring message");
+											log::warn!("Ignoring message");
 										}
 									}
 								}
@@ -121,7 +121,7 @@ impl Client {
 						}
 						Err(e) => {
 							if e.kind() != std::io::ErrorKind::WouldBlock {
-								println!("could not receive from socket: {}. Sleeping for 1s", e);
+								log::error!("could not receive from socket: {}. Sleeping for 1s", e);
 								std::thread::sleep(std::time::Duration::from_secs(1));
 							} else {
 								// Time-out, which is expected
@@ -144,7 +144,7 @@ impl Client {
 			program = None;
 
 			if let Some(p) = &p {
-				println!("Starting program:\n{:?}", p);
+				log::info!("Starting program:\n{:?}", p);
 			}
 			let mut state = self.vm.start(p.unwrap(), None);
 			let mut last_yield_time = SystemTime::now();
@@ -162,7 +162,7 @@ impl Client {
 
 				// See if there is a new program waiting
 				if let Ok(p) = rx.try_recv() {
-					println!("set new program {:?}", p);
+					log::info!("set new program {:?}", p);
 					program = Some(p);
 					running = false;
 				// Go into next iteration and start new program
@@ -188,7 +188,7 @@ impl Client {
 							running = false;
 						}
 						Outcome::Error(e) => {
-							println!(
+							log::error!(
 								"Error in VM at pc={}: {:?}, awaiting next program",
 								state.pc(),
 								e
