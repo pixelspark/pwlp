@@ -141,9 +141,12 @@ Returns information on a specific device
 }
 ````
 
-### GET /devices/<mac>/off
+### GET /devices/<mac>/<program_name>
 
-Send the default 'off' program to a device
+Send a built-in program to the device. Built-in program names:
+
+* [`off`](./src/programs/off.txt)
+* [`default`](./src/programs/default_serve.txt)
 
 ````json
 {}

@@ -2,6 +2,7 @@ use super::program::Program;
 use super::protocol::{Message, MessageType};
 use super::server::{DeviceStatus, ServerState};
 use eui48::MacAddress;
+use phf::phf_map;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -10,6 +11,11 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use warp::http::StatusCode;
 use warp::{Filter, Rejection, Reply};
+
+static BUILTIN_PROGRAMS: phf::Map<&'static str, &'static [u8]> = phf_map! {
+	"off" => include_bytes!("../programs/off.bin"),
+	"default" => include_bytes!("../programs/default_serve.bin")
+};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct APIConfig {
@@ -99,14 +105,21 @@ async fn get_device(
 	}
 }
 
-async fn set_off(
+async fn set_builtin_program(
 	state: Arc<Mutex<ServerState>>,
 	device_address: String,
+	program_name: String,
 ) -> Result<Box<dyn Reply>, Rejection> {
 	let mut s = state.lock().unwrap();
 	if s.devices.contains_key(&device_address) {
-		// Send an off program!
-		let program = Program::from_binary(include_bytes!("../programs/off.bin").to_vec());
+		if !BUILTIN_PROGRAMS.contains_key(program_name.as_str()) {
+			return Err(warp::reject::custom(APIError::NotFound(
+				"built-in program not found".to_string(),
+			)));
+		}
+
+		let program_code = BUILTIN_PROGRAMS[program_name.as_str()];
+		let program = Program::from_binary(program_code.to_vec());
 		let mut device_state = s.devices[&device_address].clone();
 		device_state.program = Some(program.clone());
 
@@ -123,7 +136,7 @@ async fn set_off(
 		Ok(Box::new(warp::reply::json(&SetReply {})))
 	} else {
 		return Err(warp::reject::custom(APIError::NotFound(
-			"dveice not found".to_string(),
+			"device not found".to_string(),
 		)));
 	}
 }
@@ -169,8 +182,8 @@ pub async fn serve_http(config: &APIConfig, state: Arc<Mutex<ServerState>>) {
 	let b = state.clone();
 	let device_off = warp::get()
 		.map(move || b.clone())
-		.and(warp::path!("devices" / String / "off").and(warp::path::end()))
-		.and_then(set_off);
+		.and(warp::path!("devices" / String / String).and(warp::path::end()))
+		.and_then(set_builtin_program);
 
 	let c = state.clone();
 	let devices = warp::path!("devices")
