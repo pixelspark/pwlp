@@ -61,15 +61,24 @@ impl APIConfig {
 }
 
 #[derive(Serialize)]
-pub struct IndexReply<'a> {
+pub struct IndexReply {
+}
+
+#[derive(Serialize)]
+pub struct DevicesReply<'a> {
 	devices: &'a HashMap<String, DeviceStatus>,
 }
 
-async fn get_index(state: Arc<Mutex<ServerState>>) -> Result<Box<dyn Reply>, Rejection> {
+async fn get_devices(state: Arc<Mutex<ServerState>>) -> Result<Box<dyn Reply>, Rejection> {
 	let s = state.lock().unwrap();
 	let sa = &(*s);
-	Ok(Box::new(warp::reply::json(&IndexReply {
+	Ok(Box::new(warp::reply::json(&DevicesReply {
 		devices: &sa.devices,
+	})))
+}
+
+async fn get_index(_state: Arc<Mutex<ServerState>>) -> Result<Box<dyn Reply>, Rejection> {
+	Ok(Box::new(warp::reply::json(&IndexReply {
 	})))
 }
 
@@ -134,23 +143,29 @@ pub async fn serve_http(config: &APIConfig, state: Arc<Mutex<ServerState>>) {
 	}
 
 	let a = state.clone();
-	let get_info = warp::get()
+	let device = warp::get()
 		.map( move || a.clone())
-		.and(warp::path!(String).and(warp::path::end()))
+		.and(warp::path!("devices" / String).and(warp::path::end()))
 		.and_then(get_device);
 
 	let b = state.clone();
-	let post_set_off = warp::get()
+	let device_off = warp::get()
 		.map( move || b.clone())
-		.and(warp::path!(String / "off").and(warp::path::end()))
+		.and(warp::path!("devices" / String / "off").and(warp::path::end()))
 		.and_then(set_off);
 
-	let index = warp::path::end().map( move || state.clone())
+	let c = state.clone();
+	let devices = warp::path!("devices").and(warp::path::end()).map( move || c.clone())
+		.and_then(get_devices);
+
+	let d = state.clone();
+	let index = warp::path::end().map( move || d.clone())
 		.and_then(get_index);
 
 	let routes = warp::any()
-		.and(get_info)
-		.or(post_set_off)
+		.and(device)
+		.or(device_off)
+		.or(devices)
 		.or(index);
 	let mut bind_address = String::from("127.0.0.1:33334");
 

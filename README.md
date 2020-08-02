@@ -104,3 +104,47 @@ Supported operators:
 * Binary: `a|b`, `a&b`, `a^b` (XOR)
 * Unary: `!a`
 * Comparison: `a==b`, `a!=b`, `a<b`, `a>b`, `a<=b`, `a>=b`
+
+## API
+
+### GET /
+
+Get server status. Can be used for health checking.
+
+````json
+{}
+````
+
+### GET /devices
+
+Returns a list of devices currently or previously connected.
+
+````json
+{
+  "devices": {
+    "aa-bb-cc-dd-ee-ff": {
+      "address": "1.2.3.4:5678",
+      "program": [10, 11, 12, ...]
+    }
+  }
+}
+````
+
+### GET /devices/<mac>
+
+Returns information on a specific device
+
+````json
+{
+  "address": "1.2.3.4:5678",
+  "program": [10, 11, 12, ...]
+}
+````
+
+### GET /devices/<mac>/off
+
+Send the default 'off' program to a device
+
+````json
+{}
+````
