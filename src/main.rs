@@ -588,5 +588,5 @@ fn vm_from_options(options: &ArgMatches) -> VM {
 }
 
 fn default_serve_program() -> Program {
-	Program::from_source(include_str!("../test/blink.txt")).unwrap()
+	Program::from_binary(include_bytes!("./programs/default_serve.bin").to_vec())
 }

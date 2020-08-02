@@ -87,7 +87,7 @@ async fn set_off(state: Arc<Mutex<ServerState>>, device_address: String) -> Resu
 	let mut s = state.lock().unwrap();
 	if s.devices.contains_key(&device_address) {
 		// Send an off program!
-		let program = Program::from_source("for(n=get_length) { set_pixel(n - 1, 0, 0, 0) }; blit; yield").unwrap();
+		let program = Program::from_binary(include_bytes!("../programs/off.bin").to_vec());
 		let mut device_state = s.devices[&device_address].clone();
 		device_state.program = Some(program.clone());
 

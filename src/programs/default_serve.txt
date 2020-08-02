@@ -1,0 +1,23 @@
+// Turn all off
+for(n=get_length) {
+	set_pixel(n-1, 0, 0, 0);
+};
+
+// Set last LED to yellow (useful to verify order of channels and configured length)
+set_pixel(get_length - 1, 40, 25, 0);
+blit;
+yield;
+
+// Blink first two LEDs alternatively at 0.5s interval
+loop {
+	if((get_precise_time % 1000) < 500) {
+		set_pixel(0, 25, 25, 25);
+		set_pixel(1, 0, 0, 0);
+	}
+	else {
+		set_pixel(1, 25, 25, 25);
+		set_pixel(0, 0, 0, 0);
+	};
+	blit;
+	yield;
+}

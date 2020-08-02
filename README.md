@@ -27,6 +27,14 @@ Host rpi
 After adding your SSH public key (`~/.ssh/id_rsa.pub`) to `~/.ssh/authorized_keys` on the Pi, you will be able to upload 
 without using a password. If you don't have an SSH key yet, run `ssh-keygen`.
 
+### Programs
+
+The binaries will include several default programs as binaries; these are in the [src/programs](./src/programs) folder
+and can be rebuilt using `./generate_programs.sh`:
+
+* `off.{txt, bin}`: the program that is sent to strips to turn off
+* `default_serve.{txt, bin}`: the default program served when no other program is specified in settings/command line
+
 ## Usage
 
 ````

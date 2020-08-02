@@ -1,0 +1,5 @@
+for(n=get_length) {
+	set_pixel(n - 1, 0, 0, 0)
+};
+blit;
+yield
