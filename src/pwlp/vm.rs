@@ -26,7 +26,7 @@ pub struct VM {
 pub enum VMError {
 	UnknownInstruction,
 	StackUnderflow,
-	RuntimeError(String)
+	RuntimeError(String),
 }
 
 pub enum Outcome {
@@ -131,7 +131,11 @@ impl<'a> State<'a> {
 				}
 
 				if *idx >= self.vm.strip.length() {
-					return Some(Outcome::Error(VMError::RuntimeError(format!("index {} exceeds strip length {}", *idx, self.vm.strip.length()))));
+					return Some(Outcome::Error(VMError::RuntimeError(format!(
+						"index {} exceeds strip length {}",
+						*idx,
+						self.vm.strip.length()
+					))));
 				}
 
 				self.vm.strip.set_pixel(*idx, r, g, b);

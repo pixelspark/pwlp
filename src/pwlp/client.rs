@@ -54,7 +54,9 @@ impl Client {
 		let server_address = server_address.to_owned();
 		log::info!(
 			"Running as client with MAC {} at {} with server {}",
-			mac_address, bind_address, server_address
+			mac_address,
+			bind_address,
+			server_address
 		);
 		let (tx, rx) = mpsc::channel();
 
@@ -90,12 +92,17 @@ impl Client {
 							match Message::from_buffer(&buf[0..amt], &secret) {
 								Err(t) => log::error!(
 									"{} error {:?} (size={}b secret={:?})",
-									source_address, t, amt, secret
+									source_address,
+									t,
+									amt,
+									secret
 								),
 								Ok(m) => {
 									log::info!(
 										"{}: {:?} t={}",
-										source_address, m.message_type, m.unix_time
+										source_address,
+										m.message_type,
+										m.unix_time
 									);
 
 									// TODO check message time
@@ -121,7 +128,10 @@ impl Client {
 						}
 						Err(e) => {
 							if e.kind() != std::io::ErrorKind::WouldBlock {
-								log::error!("could not receive from socket: {}. Sleeping for 1s", e);
+								log::error!(
+									"could not receive from socket: {}. Sleeping for 1s",
+									e
+								);
 								std::thread::sleep(std::time::Duration::from_secs(1));
 							} else {
 								// Time-out, which is expected

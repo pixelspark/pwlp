@@ -17,7 +17,7 @@ pub struct DeviceConfig {
 pub struct DeviceStatus {
 	pub address: SocketAddr,
 	pub program: Option<Program>,
-	
+
 	#[serde(skip)]
 	pub secret: String,
 
@@ -34,7 +34,7 @@ impl Serialize for Program {
 pub struct ServerState {
 	pub config: HashMap<String, DeviceConfig>,
 	pub devices: HashMap<String, DeviceStatus>,
-	pub socket: UdpSocket
+	pub socket: UdpSocket,
 }
 
 pub struct Server {
@@ -48,13 +48,13 @@ impl Server {
 		devices: HashMap<String, DeviceConfig>,
 		default_secret: &str,
 		default_program: Program,
-		bind_address: &str
+		bind_address: &str,
 	) -> std::io::Result<Server> {
 		Ok(Server {
 			state: Arc::new(Mutex::new(ServerState {
 				config: devices,
 				devices: HashMap::new(),
-				socket: UdpSocket::bind(bind_address)?
+				socket: UdpSocket::bind(bind_address)?,
 			})),
 			default_secret: default_secret.to_string(),
 			default_program,
@@ -102,13 +102,20 @@ impl Server {
 					match Message::from_buffer(&buf[0..amt], secret.as_bytes()) {
 						Err(t) => log::error!(
 							"{} error {:?} (size={}b source={} secret={:?})",
-							source_address, t, amt, mac, secret
+							source_address,
+							t,
+							amt,
+							mac,
+							secret
 						),
 						Ok(msg) => {
 							let mac_identifier = mac.to_canonical();
 							log::info!(
 								"{} @ {}: {:?} t={}",
-								&mac_identifier, &source_address, msg.message_type, msg.unix_time
+								&mac_identifier,
+								&source_address,
+								msg.message_type,
+								msg.unix_time
 							);
 
 							// Update or create device status
@@ -124,7 +131,7 @@ impl Server {
 									},
 								};
 								new_status.last_seen = Instant::now();
-								
+
 								match msg.message_type {
 									MessageType::Ping => {
 										let pong = Message {
@@ -137,20 +144,24 @@ impl Server {
 										// Check deserialize
 										let secret_bytes = secret.as_bytes();
 										assert!(
-											Message::from_buffer(&pong.signed(secret_bytes), secret_bytes).is_ok(),
+											Message::from_buffer(
+												&pong.signed(secret_bytes),
+												secret_bytes
+											)
+											.is_ok(),
 											"deserialize own message"
 										);
 
-										if let Err(t) =
-											socket.send_to(&pong.signed(secret.as_bytes()), source_address)
-										{
+										if let Err(t) = socket.send_to(
+											&pong.signed(secret.as_bytes()),
+											source_address,
+										) {
 											println!("Send pong failed: {:?}", t);
 										}
 
 										let device_program = if let Some(p) = new_status.program {
 											p
-										}
-										else if let Some(config) = &device_config {
+										} else if let Some(config) = &device_config {
 											if let Some(path) = &config.program {
 												Program::from_file(&path)
 													.expect("error loading device-specific program")
@@ -170,8 +181,8 @@ impl Server {
 
 										new_status.program = Some(device_program);
 
-										if let Err(t) =
-											socket.send_to(&run.signed(secret.as_bytes()), source_address)
+										if let Err(t) = socket
+											.send_to(&run.signed(secret.as_bytes()), source_address)
 										{
 											println!("Send pong failed: {:?}", t);
 										}
