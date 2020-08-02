@@ -468,15 +468,15 @@ fn disassemble(matches: &ArgMatches) -> std::io::Result<()> {
 
 async fn serve(config: Config, serve_matches: &ArgMatches<'_>) -> std::io::Result<()> {
 	let mut server = build_server(&config, serve_matches)?;
-	let state = server.state();
-
-	let server_task = tokio::task::spawn_blocking(move || match server.run() {
-		Ok(()) => (),
-		Err(t) => log::error!("PWLP server ended with error: {:?}", t),
-	});
 
 	#[cfg(feature = "api")]
 	{
+		let state = server.state();
+		let server_task = tokio::task::spawn_blocking(move || match server.run() {
+			Ok(()) => (),
+			Err(t) => log::error!("PWLP server ended with error: {:?}", t),
+		});
+
 		let mut api_config = config.api.clone().unwrap_or_else(pwlp::api::APIConfig::new);
 
 		if let Some(v) = serve_matches.value_of("bind-api") {
@@ -488,11 +488,11 @@ async fn serve(config: Config, serve_matches: &ArgMatches<'_>) -> std::io::Resul
 		}
 
 		let (_, _) = tokio::join!(pwlp::api::serve_http(&api_config, state), server_task);
+		Ok(())
 	}
 
 	#[cfg(not(feature = "api"))]
-	tokio::join!(server_task);
-	Ok(())
+	server.run()	
 }
 
 fn build_server(config: &Config, serve_matches: &ArgMatches<'_>) -> std::io::Result<Server> {
