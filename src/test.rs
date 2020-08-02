@@ -5,7 +5,7 @@ use std::fs;
 use std::fs::File;
 
 #[cfg(test)]
-use super::pwlp::parse;
+use super::pwlp::program::Program;
 
 #[cfg(test)]
 use std::io::Read;
@@ -24,7 +24,7 @@ fn compare_output_of_compiler_to_stored_binaries() {
 					.read_to_string(&mut source)
 					.unwrap();
 
-				match parse(&source) {
+				match Program::from_source(&source) {
 					Ok(prg) => {
 						// Compare with stored binary
 						let bin_path = name.path().with_extension("bin");
