@@ -1,7 +1,39 @@
 <!DOCTYPE html>
 <html style="display: block; width: 100%; height: 100%; box-sizing: border-box;">
-	<body style="display: flex; flex-direction: row; width: 100%; height: 100%; box-sizing: border-box; align-items: stretch; justify-items: stretch; margin: 0px;">
-		<textarea id="source" onkeyup="run()" style="flex-grow: 1;">
+	<head>
+		<style type="text/css">
+		body {
+			display: flex;
+			flex-direction: column;
+			width: 100%;
+			height: 100%;
+			box-sizing: border-box;
+			align-items: stretch;
+			justify-items: stretch;
+			margin: 0px;
+		}
+
+		#editor {
+			display: flex;
+			flex-direction: row;
+			width: 100%;
+			height: 100%;
+			box-sizing: border-box;
+			align-items: stretch;
+			justify-items: stretch;
+			margin: 0px;
+		}
+
+		textarea {
+			margin: 5px;
+			font-family: monospace;
+		}
+		</style>
+	</head>
+
+	<body>
+		<div id="editor">
+			<textarea id="source" onkeyup="run()" style="flex-grow: 1;">
 // Turn all off
 for(n=get_length) {
 	set_pixel(n-1, 0, 0, 0);
@@ -25,17 +57,42 @@ loop {
 	blit;
 	yield;
 }
-		</textarea>
+			</textarea>
 
-		<textarea readonly id="binary" style="flex-grow: 1;"></textarea>
-		<textarea readonly id="assembly" style="flex-grow: 1;"></textarea>
-		<textarea readonly id="output" style="flex-grow: 1;"></textarea>
+			<textarea readonly id="binary" style="flex-grow: 1;"></textarea>
+			<textarea readonly id="assembly" style="flex-grow: 1;"></textarea>
+			<textarea readonly id="output" style="flex-grow: 1;"></textarea>
+		</div>
+		<button onclick="benchmark()">Benchmark</button>
 	</body>
 </html>
 
 <script type="module">
 import init, { compile, assemble, run as runProgram } from './pkg/pwlp.js';
 let initialized = false;
+
+window.benchmark = function() {
+	const source = document.getElementById("source").value;
+
+	// Warming up
+	for(let x = 0; x<100; x++) {
+		compile(source);
+	}
+
+	const start = performance.now();
+	const iterations = 100000;
+	let a = 0;
+	for(;a<iterations; a++) {
+		compile(source);
+		if(a % 1000 === 0) {
+			if((performance.now() - start) > 10000) {
+				break;
+			}
+		}
+	}
+	const elapsed = performance.now() - start;
+	alert("Time elapsed: " + elapsed + "ms, " + (elapsed / a).toFixed(2) + "ms/iteration, " + (a / elapsed * 1000).toFixed(0)+ " iterations/sec");
+};
 
 window.run = async function() {
 	if(!initialized) {
@@ -46,7 +103,8 @@ window.run = async function() {
 	let res = "";
 	try {
 		const res = compile(source);
-		document.getElementById("binary").value = res.join(" ");
+		console.log({res});
+		document.getElementById("binary").value = [...res].map(x => x.toString(16).toUpperCase()).join(" ");
 
 		const ass = assemble(source);
 		document.getElementById("assembly").value = ass;
