@@ -1,6 +1,6 @@
-mod pwlp;
-mod test;
+
 extern crate clap;
+mod pwlp;
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use pwlp::client::Client;

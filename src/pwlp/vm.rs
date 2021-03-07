@@ -6,7 +6,7 @@ use rand_chacha::ChaCha20Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct State<'a> {
-	vm: &'a mut VM,
+	pub vm: &'a mut VM,
 	program: Program,
 	pc: usize,
 	stack: Vec<u32>,
@@ -39,12 +39,13 @@ pub enum Outcome {
 
 impl<'a> State<'a> {
 	fn new(vm: &'a mut VM, program: Program, instruction_limit: Option<usize>) -> State<'a> {
+		let start_time = if vm.deterministic { SystemTime::UNIX_EPOCH } else { SystemTime::now() };
 		State {
 			vm,
 			program,
 			pc: 0,
 			stack: vec![],
-			start_time: SystemTime::now(),
+			start_time,
 			instruction_limit,
 			instruction_count: 0,
 			deterministic_rng: ChaCha20Rng::from_seed([0u8; 32]),

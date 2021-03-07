@@ -11,6 +11,24 @@ pub trait Strip {
 	fn get_pixel(&self, idx: u32) -> Color;
 }
 
+impl dyn Strip {
+	pub fn to_string(&self) -> String {
+		let mut str = String::new();
+
+		for idx in 0..self.length() {
+			let color = self.get_pixel(idx);
+			str += &format!(
+				"{:02x}{:02x}{:02x} ",
+				color.r,
+				color.g,
+				color.b
+			);
+		}
+
+		str
+	}
+}
+
 pub struct DummyStrip {
 	trace: bool,
 	length: u32,

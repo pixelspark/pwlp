@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html style="display: block; width: 100%; height: 100%; box-sizing: border-box;">
+	<body style="display: flex; flex-direction: row; width: 100%; height: 100%; box-sizing: border-box; align-items: stretch; justify-items: stretch; margin: 0px;">
+		<textarea id="source" onkeyup="run()" style="flex-grow: 1;">
+// Turn all off
+for(n=get_length) {
+	set_pixel(n-1, 0, 0, 0);
+};
+
+// Set last LED to yellow (useful to verify order of channels and configured length)
+set_pixel(get_length - 1, 40, 25, 0);
+blit;
+yield;
+
+// Blink first two LEDs alternatively at 0.5s interval
+loop {
+	if((get_precise_time % 1000) < 500) {
+		set_pixel(0, 25, 25, 25);
+		set_pixel(1, 0, 0, 0);
+	}
+	else {
+		set_pixel(1, 25, 25, 25);
+		set_pixel(0, 0, 0, 0);
+	};
+	blit;
+	yield;
+}
+		</textarea>
+
+		<textarea readonly id="binary" style="flex-grow: 1;"></textarea>
+		<textarea readonly id="assembly" style="flex-grow: 1;"></textarea>
+		<textarea readonly id="output" style="flex-grow: 1;"></textarea>
+	</body>
+</html>
+
+<script type="module">
+import init, { compile, assemble, run as runProgram } from './pkg/pwlp.js';
+let initialized = false;
+
+window.run = async function() {
+	if(!initialized) {
+		initialized = true;
+		await init();
+	}
+	const source = document.getElementById("source").value;
+	let res = "";
+	try {
+		const res = compile(source);
+		document.getElementById("binary").value = res.join(" ");
+
+		const ass = assemble(source);
+		document.getElementById("assembly").value = ass;
+
+		const out = runProgram(res, 5, 1500);
+		document.getElementById("output").value = out;
+	}
+	catch(e) {
+		console.error(e);
+		document.getElementById("output").value = e.toString();
+		document.getElementById("assembly").value = "";
+	}
+};
+
+window.run();
+</script>

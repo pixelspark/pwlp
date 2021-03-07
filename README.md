@@ -2,12 +2,12 @@
 
 ## Building
 
-Regular build:
+### Regular build
 ````sh
 cargo build
 ````
 
-For Raspberry Pi:
+### For Raspberry Pi
 ````sh
 cargo build --target=arm-unknown-linux-musleabi --features=raspberrypi 
 ````
@@ -26,6 +26,20 @@ Host rpi
 
 After adding your SSH public key (`~/.ssh/id_rsa.pub`) to `~/.ssh/authorized_keys` on the Pi, you will be able to upload 
 without using a password. If you don't have an SSH key yet, run `ssh-keygen`.
+
+### WASM
+
+````sh
+cargo install wasm-pack
+wasm-pack build --target=web --release -- --no-default-features --features=wasm
+````
+
+See [index.html](./index.html) for a usage example. To test:
+
+````sh
+npm install -g http-server
+http-server
+````
 
 ### Programs
 

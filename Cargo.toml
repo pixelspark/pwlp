@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 clap = { version = "~2.33.0", features = ["color"] }
 hmac-sha1 = "0.1.3"
-eui48 = "0.4.6"
+eui48 = {version = "0.4.6", optional = true }
 toml = "0.5.3"
 byteorder = "1.3.2"
 serde = { version = "1.0", features = ["derive"] }
@@ -17,14 +17,22 @@ nom = "5.0.1"
 rand = "0.7.2"
 rppal = { version = "0.11.3", optional = true }
 rand_chacha = "0.2.1"
-mac_address = "1.0.3"
+mac_address = {version = "1.0.3", optional = true }
 tokio = { version = "0.2", features = ["macros"] }
 warp = { optional = true, version = "0.2.4" }
 env_logger = "0.7.1"
 log = "0.4.0"
 phf = { version = "0.7.24", features = ["macros"], optional = true }
+wasm-bindgen = { version = "0.2.68", optional = true }
+
+[lib]
+name = "pwlp"
+crate-type = ["cdylib"]
 
 [features]
-default = ["api"]
+default = ["api", "client", "server"]
 raspberrypi = ["rppal"]
-api = ["warp", "phf"]
+api = ["warp", "phf", "eui48", "mac_address"]
+wasm = ["wasm-bindgen"]
+client = ["eui48", "mac_address"]
+server = ["eui48", "mac_address"]
