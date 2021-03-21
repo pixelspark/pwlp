@@ -28,32 +28,42 @@
 			margin: 5px;
 			font-family: monospace;
 		}
+
+		div#output td {
+			height: 6px;
+			width: 6px;
+		}
+
+		div#output tr, div#output td, div#output table {
+			margin: 0px;
+			padding: 0px;
+			border-collapse: collapse;
+		}
 		</style>
 	</head>
 
 	<body>
 		<div id="editor">
 			<textarea id="source" onkeyup="run()" style="flex-grow: 1;">
-// Turn all off
-for(n=get_length) {
-	set_pixel(n-1, 0, 0, 0);
-};
+tail = 9;
 
-// Set last LED to yellow (useful to verify order of channels and configured length)
-set_pixel(get_length - 1, 40, 25, 0);
-blit;
-yield;
-
-// Blink first two LEDs alternatively at 0.5s interval
 loop {
-	if((get_precise_time % 1000) < 500) {
-		set_pixel(0, 25, 25, 25);
-		set_pixel(1, 0, 0, 0);
-	}
-	else {
-		set_pixel(1, 25, 25, 25);
-		set_pixel(0, 0, 0, 0);
+	for(n = get_length) {
+		set_pixel(n-1, 0, 0, 0);
 	};
+	t = get_precise_time;
+
+		for(i = tail) {
+	set_pixel((t + i) % get_length, 255 - (i * (255 / tail)), 0 ,0);
+	};
+
+
+	for(i=tail) {
+		set_pixel((t - i) % get_length, 255 - (i * (255 / tail)), 0 ,0);
+	};
+
+	set_pixel(t % get_length, 255, 100, 50);
+
 	blit;
 	yield;
 }
@@ -61,7 +71,7 @@ loop {
 
 			<textarea readonly id="binary" style="flex-grow: 1;"></textarea>
 			<textarea readonly id="assembly" style="flex-grow: 1;"></textarea>
-			<textarea readonly id="output" style="flex-grow: 1;"></textarea>
+			<div id="output" style="flex-grow: 1;"></div>
 		</div>
 		<button onclick="benchmark()">Benchmark</button>
 	</body>
@@ -70,6 +80,28 @@ loop {
 <script type="module">
 import init, { compile, assemble, run as runProgram } from './pkg/pwlp.js';
 let initialized = false;
+
+if(window.localStorage.getItem("source")) {
+	document.getElementById("source").value = window.localStorage.getItem("source");
+}
+
+// Use tab key for indent in source view
+// See https://stackoverflow.com/questions/6637341/use-tab-to-indent-in-textarea
+document.getElementById('source').addEventListener('keydown', function(e) {
+	if (e.key == 'Tab') {
+		e.preventDefault();
+		var start = this.selectionStart;
+		var end = this.selectionEnd;
+
+		// set textarea value to: text before caret + tab + text after caret
+		this.value = this.value.substring(0, start) +
+			"\t" + this.value.substring(end);
+
+		// put caret at right position again
+		this.selectionStart =
+			this.selectionEnd = start + 1;
+	}
+});
 
 window.benchmark = function() {
 	const source = document.getElementById("source").value;
@@ -95,13 +127,22 @@ window.benchmark = function() {
 };
 
 window.run = async function() {
+	if(window.event) {
+		window.event.preventDefault();
+		window.event.stopPropagation();
+	}
+
 	if(!initialized) {
 		initialized = true;
 		await init();
 	}
 	const source = document.getElementById("source").value;
+	window.localStorage.setItem("source", source);
+
 	let res = "";
 	try {
+		const outputDiv = document.getElementById("output");
+		outputDiv.innerHTML = "";
 		const res = compile(source);
 		console.log({res});
 		document.getElementById("binary").value = [...res].map(x => x.toString(16).toUpperCase()).join(" ");
@@ -109,12 +150,30 @@ window.run = async function() {
 		const ass = assemble(source);
 		document.getElementById("assembly").value = ass;
 
-		const out = runProgram(res, 5, 1500);
-		document.getElementById("output").value = out;
+		const out = runProgram(res, 25, 10000);
+		const colors = out.split("\n").slice(0, 50).map(x => x.split(" "));
+
+		// Create a table
+		const table = document.createElement("TABLE");
+		colors.forEach(row => {
+			const tr = document.createElement("TR");
+			row.forEach(color => {
+				if(color !== "") {
+					const td = document.createElement("TD");
+					td.style = "background-color: #" + color;
+					td.title = color;
+					tr.appendChild(td);
+				}
+			});
+			table.appendChild(tr);
+		});
+
+		// Remove everyting in out
+		outputDiv.appendChild(table);
 	}
 	catch(e) {
 		console.error(e);
-		document.getElementById("output").value = e.toString();
+		document.getElementById("output").innerHTML = "";
 		document.getElementById("assembly").value = "";
 	}
 };
