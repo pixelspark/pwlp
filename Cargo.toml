@@ -1,10 +1,9 @@
 [package]
 name = "pwlp"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Tommy van der Vorst <tommy@pixelspark.nl>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
 
 [dependencies]
 clap = { version = "~2.33.0", features = ["color"] }
