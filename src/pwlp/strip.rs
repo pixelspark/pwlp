@@ -17,12 +17,7 @@ impl dyn Strip {
 
 		for idx in 0..self.length() {
 			let color = self.get_pixel(idx);
-			str += &format!(
-				"{:02x}{:02x}{:02x} ",
-				color.r,
-				color.g,
-				color.b
-			);
+			str += &format!("{:02x}{:02x}{:02x} ", color.r, color.g, color.b);
 		}
 
 		str

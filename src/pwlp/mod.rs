@@ -7,7 +7,6 @@ pub mod instructions;
 pub mod program;
 pub use program::*;
 
-
 #[cfg(feature = "client")]
 pub mod protocol;
 

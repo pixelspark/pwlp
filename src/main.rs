@@ -1,4 +1,3 @@
-
 extern crate clap;
 mod pwlp;
 
@@ -492,7 +491,7 @@ async fn serve(config: Config, serve_matches: &ArgMatches<'_>) -> std::io::Resul
 	}
 
 	#[cfg(not(feature = "api"))]
-	server.run()	
+	server.run()
 }
 
 fn build_server(config: &Config, serve_matches: &ArgMatches<'_>) -> std::io::Result<Server> {

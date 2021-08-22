@@ -39,7 +39,11 @@ pub enum Outcome {
 
 impl<'a> State<'a> {
 	fn new(vm: &'a mut VM, program: Program, instruction_limit: Option<usize>) -> State<'a> {
-		let start_time = if vm.deterministic { SystemTime::UNIX_EPOCH } else { SystemTime::now() };
+		let start_time = if vm.deterministic {
+			SystemTime::UNIX_EPOCH
+		} else {
+			SystemTime::now()
+		};
 		State {
 			vm,
 			program,
