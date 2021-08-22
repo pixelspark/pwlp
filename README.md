@@ -165,3 +165,7 @@ Send a built-in program to the device. Built-in program names:
 ````json
 {}
 ````
+
+## License
+
+[MIT](./LICENSE.txt)
