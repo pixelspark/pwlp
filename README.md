@@ -82,7 +82,7 @@ For more information see [protocol.md](https://git.pixelspark.nl/pixelspark/espl
 
 ## Script language
 
-Example scripts can be found in the [tests](./tests/) folder. 
+Example scripts can be found in the [test](./test/) folder. 
 
 ### Statements
 
