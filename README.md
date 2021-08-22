@@ -121,7 +121,7 @@ Supported operators:
 
 ## API
 
-### GET /
+### GET `/`
 
 Get server status. Can be used for health checking.
 
@@ -129,7 +129,7 @@ Get server status. Can be used for health checking.
 {}
 ````
 
-### GET /devices
+### GET `/devices`
 
 Returns a list of devices currently or previously connected.
 
@@ -144,7 +144,7 @@ Returns a list of devices currently or previously connected.
 }
 ````
 
-### GET /devices/<mac>
+### GET `/devices/<mac>`
 
 Returns information on a specific device
 
@@ -155,7 +155,7 @@ Returns information on a specific device
 }
 ````
 
-### GET /devices/<mac>/<program_name>
+### GET `/devices/<mac>/<program_name>`
 
 Send a built-in program to the device. Built-in program names:
 
