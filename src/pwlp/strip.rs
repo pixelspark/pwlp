@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 pub struct Color {
 	pub r: u8,
 	pub g: u8,
@@ -11,16 +13,14 @@ pub trait Strip {
 	fn get_pixel(&self, idx: u32) -> Color;
 }
 
-impl dyn Strip {
-	pub fn to_string(&self) -> String {
-		let mut str = String::new();
-
+impl Display for dyn Strip {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		for idx in 0..self.length() {
 			let color = self.get_pixel(idx);
-			str += &format!("{:02x}{:02x}{:02x} ", color.r, color.g, color.b);
+			write!(f, "{:02x}{:02x}{:02x} ", color.r, color.g, color.b)?;
 		}
 
-		str
+		Ok(())
 	}
 }
 

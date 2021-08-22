@@ -1,4 +1,4 @@
-mod pwlp;
+pub mod pwlp;
 
 #[cfg(feature = "wasm")]
 mod lib {
